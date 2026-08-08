@@ -1,0 +1,32 @@
+name: ALice KSU source fetch
+
+on:
+  push:
+    branches:
+      - alice-build-temp
+  workflow_dispatch:
+
+jobs:
+  fetch-ksu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch exact KernelSU-Next legacy commit
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone --filter=blob:none https://github.com/KernelSU-Next/KernelSU-Next.git ksun
+          cd ksun
+          git checkout a54e4fa46c6cc25bcaa055cf14d790194beffed8
+          git rev-parse HEAD
+          cd ..
+          tar -C ksun -czf ksu-next-a54e4fa-kernel-uapi.tar.gz kernel uapi
+          sha256sum ksu-next-a54e4fa-kernel-uapi.tar.gz | tee SHA256SUMS.txt
+      - name: Upload exact KSU source
+        uses: actions/upload-artifact@v4
+        with:
+          name: alice-ksu-next-a54e4fa-source
+          path: |
+            ksu-next-a54e4fa-kernel-uapi.tar.gz
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 1
