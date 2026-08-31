@@ -192,9 +192,6 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 	    !cpufreq_can_do_remote_dvfs(sg_policy->policy))
 		return false;
 
-	if (sg_policy->work_in_progress)
-		return false;
-
 	if (unlikely(sg_policy->need_freq_update)) {
 		sg_policy->need_freq_update = false;
 		/*
@@ -248,7 +245,7 @@ static int sugov_select_scaling_cpu(void)
 #ifdef CONFIG_SCHED_EMS
 		util = ml_boosted_cpu_util(cpu) + rt;
 #else
-		util = boosted_cpu_util(cpu, rt);
+		util = boosted_cpu_util(cpu) + rt;
 #endif
 		if (util < min) {
 			min = util;
@@ -280,13 +277,13 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 
 		policy->cur = next_freq;
 		trace_cpu_frequency(next_freq, smp_processor_id());
-	} else {
+	} else if (!sg_policy->work_in_progress) {
 		cpu = sugov_select_scaling_cpu();
-		if (cpu < 0)
-			return;
-
 		sg_policy->work_in_progress = true;
-		irq_work_queue_on(&sg_policy->irq_work, cpu);
+		if (cpu >= 0)
+			irq_work_queue_on(&sg_policy->irq_work, cpu);
+		else
+			irq_work_queue(&sg_policy->irq_work);
 	}
 }
 
@@ -350,10 +347,9 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu)
 #ifdef CONFIG_SCHED_EMS
 	*util = ml_boosted_cpu_util(cpu) + rt;
 #else
-	*util = boosted_cpu_util(cpu, rt);
+	*util = boosted_cpu_util(cpu) + rt;
 #endif
 	*util = freqvar_boost_vector(cpu, *util);
-	*util = boosted_cpu_util(cpu);
 	*util = min(*util, max_cap);
 	*max = max_cap;
 
@@ -492,15 +488,21 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 static void sugov_work(struct kthread_work *work)
 {
 	struct sugov_policy *sg_policy = container_of(work, struct sugov_policy, work);
+	unsigned long flags;
+	unsigned int freq;
 
 	down_write(&sg_policy->policy->rwsem);
+	/* Consume the newest request; updates during the driver queue a new pass. */
+	raw_spin_lock_irqsave(&sg_policy->update_lock, flags);
+	freq = sg_policy->next_freq;
+	sg_policy->work_in_progress = false;
+	raw_spin_unlock_irqrestore(&sg_policy->update_lock, flags);
+
 	mutex_lock(&sg_policy->work_lock);
-	__cpufreq_driver_target(sg_policy->policy, sg_policy->next_freq,
+	__cpufreq_driver_target(sg_policy->policy, freq,
 				CPUFREQ_RELATION_L);
 	mutex_unlock(&sg_policy->work_lock);
 	up_write(&sg_policy->policy->rwsem);
-
-	sg_policy->work_in_progress = false;
 }
 
 static void sugov_irq_work(struct irq_work *irq_work)
@@ -509,19 +511,6 @@ static void sugov_irq_work(struct irq_work *irq_work)
 
 	sg_policy = container_of(irq_work, struct sugov_policy, irq_work);
 
-	/*
-	 * For RT and deadline tasks, the schedutil governor shoots the
-	 * frequency to maximum. Special care must be taken to ensure that this
-	 * kthread doesn't result in the same behavior.
-	 *
-	 * This is (mostly) guaranteed by the work_in_progress flag. The flag is
-	 * updated only at the end of the sugov_work() function and before that
-	 * the schedutil governor rejects all other frequency scaling requests.
-	 *
-	 * There is a very rare case though, where the RT thread yields right
-	 * after the work_in_progress flag is cleared. The effects of that are
-	 * neglected for now.
-	 */
 	kthread_queue_work(&sg_policy->worker, &sg_policy->work);
 }
 
@@ -813,6 +802,10 @@ tunables_init:
 
 	tunables->up_rate_limit_us = cpufreq_policy_transition_delay_us(policy);
 	tunables->down_rate_limit_us = cpufreq_policy_transition_delay_us(policy);
+	if (IS_ENABLED(CONFIG_ALICE_EAS_BALANCED)) {
+		tunables->up_rate_limit_us = 2000;
+		tunables->down_rate_limit_us = 8000;
+	}
 
 	policy->governor_data = sg_policy;
 	sg_policy->tunables = tunables;

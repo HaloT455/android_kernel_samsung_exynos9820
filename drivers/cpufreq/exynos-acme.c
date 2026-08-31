@@ -1062,6 +1062,19 @@ static __init int init_table(struct exynos_cpufreq_domain *domain)
 	cal_dfs_get_rate_table(domain->cal_id, table);
 	cal_dfs_get_asv_table(domain->cal_id, volt_table);
 
+	/* Capture firmware OPP evidence without changing clocks or voltages. */
+	if (IS_ENABLED(CONFIG_ALICE_EAS_BALANCED)) {
+		pr_info("ALice OPP: domain%d cal=%#x min=%u max=%u kHz\n",
+			domain->id, domain->cal_id,
+			domain->min_freq, domain->max_freq);
+		for (index = 0; index < domain->table_size; index++)
+			pr_info("ALice OPP: domain%d L%u %lu kHz %u uV %s\n",
+				domain->id, index, table[index], volt_table[index],
+				table[index] >= domain->min_freq &&
+				table[index] <= domain->max_freq ?
+				"enabled" : "outside-policy");
+	}
+
 	for (index = 0; index < domain->table_size; index++) {
 		domain->freq_table[index].driver_data = index;
 

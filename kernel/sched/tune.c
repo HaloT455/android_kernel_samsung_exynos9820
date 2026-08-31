@@ -11,6 +11,7 @@
 #include <trace/events/sched.h>
 
 #include "sched.h"
+#include "cpu_ui.h"
 #include "tune.h"
 
 bool schedtune_initialized = false;
@@ -386,6 +387,9 @@ int schedtune_cpu_boost(int cpu)
 	struct boost_groups *bg;
 	u64 now;
 
+	if (sched_cpu_ui_active())
+		return sched_cpu_ui_cpu_boost(cpu);
+
 	bg = &per_cpu(cpu_boost_groups, cpu);
 	now = sched_clock_cpu(cpu);
 
@@ -403,6 +407,9 @@ int schedtune_task_boost(struct task_struct *p)
 
 	if (unlikely(!schedtune_initialized))
 		return 0;
+
+	if (sched_cpu_ui_active())
+		return sched_cpu_ui_task_boost(p);
 
 	/* Get task boost value */
 	rcu_read_lock();
@@ -454,6 +461,9 @@ int schedtune_prefer_idle(struct task_struct *p)
 
 	if (unlikely(!schedtune_initialized))
 		return 0;
+
+	if (sched_cpu_ui_active())
+		return sched_cpu_ui_prefer_idle(p);
 
 	/* Get prefer_idle value */
 	rcu_read_lock();

@@ -550,6 +550,17 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &one,
 	},
 #endif
+#ifdef CONFIG_SCHED_CPU_UI_HINTS
+	{
+		.procname	= "sched_cpu_ui_hints",
+		.data		= &sysctl_sched_cpu_ui_hints,
+		.maxlen		= sizeof(sysctl_sched_cpu_ui_hints),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
+#endif
 #ifdef CONFIG_PROVE_LOCKING
 	{
 		.procname	= "prove_locking",

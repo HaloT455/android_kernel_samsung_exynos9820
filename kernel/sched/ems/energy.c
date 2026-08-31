@@ -136,6 +136,10 @@ unsigned int calculate_energy(struct task_struct *p, int target_cpu)
 			if (util[i] > max_util)
 				max_util = util[i];
 
+		/* Estimate the OPP with the same 25% headroom as schedutil. */
+		if (IS_ENABLED(CONFIG_ALICE_EAS_BALANCED))
+			max_util += max_util >> 2;
+
 		/*
 		 * 2. Find the capacity according to biggest utilization in
 		 *    coregroup.
@@ -150,6 +154,9 @@ unsigned int calculate_energy(struct task_struct *p, int target_cpu)
 				break;
 			}
 		}
+		/* Above the highest OPP, normalize with that cluster's capacity. */
+		capacity = table->states[cap_idx].cap;
+		capacity_s = table->states[cap_idx].cap_s;
 
 		/*
 		 * 3. Get the utilization sum of coregroup. Since cpu

@@ -451,6 +451,18 @@ static int freqvar_rate_limit_init(struct device_node *dn, const struct cpumask 
 	if (ret)
 		goto fail_init;
 
+	if (IS_ENABLED(CONFIG_ALICE_EAS_BALANCED)) {
+		struct freqvar_table *pos;
+
+		/* Keep the native boost tables and writable runtime rate controls. */
+		for (pos = rate_limit->up_table;
+		     pos->frequency != CPUFREQ_TABLE_END; pos++)
+			pos->value = 2;
+		for (pos = rate_limit->down_table;
+		     pos->frequency != CPUFREQ_TABLE_END; pos++)
+			pos->value = 8;
+	}
+
 	ret = sugov_sysfs_add_attr(policy, &freqvar_up_rate_limit.attr);
 	if (ret)
 		goto fail_init;

@@ -6,6 +6,10 @@
 
 struct ctl_table;
 
+#ifdef CONFIG_SCHED_CPU_UI_HINTS
+extern int sysctl_sched_cpu_ui_hints;
+#endif
+
 #ifdef CONFIG_DETECT_HUNG_TASK
 extern int	     sysctl_hung_task_check_count;
 extern unsigned int  sysctl_hung_task_panic;

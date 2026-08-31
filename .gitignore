@@ -131,3 +131,5 @@ kernel/configs/android-*.cfg
 *.patch
 out/
 toolchain/
+/out-alice/
+/scripts/__pycache__/

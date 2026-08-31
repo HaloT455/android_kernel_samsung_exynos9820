@@ -16,3 +16,15 @@ config EXYNOS_ACPM_THERMAL
 	help
 	  This feature supports ACPM TMU plug-in for Exynos thermal driver.
 
+config ALICE_EAS_BALANCED
+	bool "ALice Exynos9820 balanced EMS and 65C CPU cooling onset"
+	depends on SOC_EXYNOS9820 && SCHED_EMS && CPU_FREQ_GOV_SCHEDUTIL
+	depends on EXYNOS_THERMAL=y
+	default n
+	help
+	  Use 2ms up / 8ms down schedutil defaults and account for its
+	  frequency headroom in EMS energy estimates. Apply a 65C software
+	  cooling onset to the BIG, MID and LITTLE CPU thermal zones after
+	  firmware ECT data is loaded. Preserve the higher thermal targets,
+	  emergency trips, hotplug protection, GPU, battery and charging rules.
+	  This is an experimental device profile requiring hardware testing.
