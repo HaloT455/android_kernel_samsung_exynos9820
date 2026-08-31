@@ -71,7 +71,10 @@ done | cpio --quiet -pd $cpio_dir >/dev/null 2>&1
 find $cpio_dir -type f -print0 |
 	xargs -0 -P8 -n1 perl -pi -e 'BEGIN {undef $/;}; s/\/\*((?!SPDX).)*?\*\///smg;'
 
-tar -Jcf $tarfile -C $cpio_dir/ . > /dev/null
+# Archive leaf entries explicitly: directory mtimes on the build filesystem
+# can change while tar traverses them. File-change errors remain fatal.
+(cd "$cpio_dir" && find . ! -type d -print0) |
+	tar --null --no-recursion -Jcf "$tarfile" -C "$cpio_dir/" -T - > /dev/null
 
 echo "$src_files_md5" >  kernel/kheaders.md5
 echo "$obj_files_md5" >> kernel/kheaders.md5
