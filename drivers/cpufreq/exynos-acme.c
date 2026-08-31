@@ -1322,7 +1322,10 @@ static int init_dm(struct exynos_cpufreq_domain *domain,
 static __init int init_domain(struct exynos_cpufreq_domain *domain,
 					struct device_node *dn)
 {
-	unsigned int val;
+	unsigned int val, dt_max_freq = 0;
+	unsigned long *rate_table = NULL;
+	unsigned int *volt_table = NULL;
+	unsigned int index;
 	int ret;
 
 	mutex_init(&domain->lock);
@@ -1337,10 +1340,47 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 	 * tree and CAL. In case of min-freq, min frequency is selected
 	 * to bigger one.
 	 */
-	if (!of_property_read_u32(dn, "max-freq", &val))
+	if (!of_property_read_u32(dn, "max-freq", &val)) {
+		dt_max_freq = val;
 		domain->max_freq = min(domain->max_freq, val);
+	}
 	if (!of_property_read_u32(dn, "min-freq", &val))
 		domain->min_freq = max(domain->min_freq, val);
+
+	/*
+	 * CPU4-5's Exynos9820 CAL table contains a firmware-provided 2.4GHz
+	 * OPP which the normal-version limit hides. Enable only that exact OPP
+	 * after independently validating the DT ceiling, rate and ASV voltage.
+	 * Keep the stock ceiling on every allocation or validation failure.
+	 */
+	if (IS_ENABLED(CONFIG_ALICE_A75_2400) &&
+	    cpumask_weight(&domain->cpus) == 2 &&
+	    cpumask_test_cpu(4, &domain->cpus) &&
+	    cpumask_test_cpu(5, &domain->cpus) &&
+	    dt_max_freq >= 2400000) {
+		rate_table = kcalloc(domain->table_size, sizeof(*rate_table),
+				     GFP_KERNEL);
+		volt_table = kcalloc(domain->table_size, sizeof(*volt_table),
+				     GFP_KERNEL);
+		if (rate_table && volt_table) {
+			cal_dfs_get_rate_table(domain->cal_id, rate_table);
+			cal_dfs_get_asv_table(domain->cal_id, volt_table);
+			for (index = 0; index < domain->table_size; index++) {
+				if (rate_table[index] != 2400000 ||
+				    !volt_table[index])
+					continue;
+				domain->max_freq = 2400000;
+				pr_info("ALice A75: enabled verified 2400000 kHz OPP at %u uV\n",
+					volt_table[index]);
+				break;
+			}
+		}
+		if (domain->max_freq != 2400000)
+			pr_warn("ALice A75: 2.4GHz validation failed; retaining %u kHz\n",
+				domain->max_freq);
+		kfree(volt_table);
+		kfree(rate_table);
+	}
 
 	/* If this domain has boost freq, change max */
 	val = exynos_pstate_get_boost_freq(cpumask_first(&domain->cpus));
