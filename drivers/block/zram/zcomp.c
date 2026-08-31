@@ -119,12 +119,16 @@ ssize_t zcomp_available_show(const char *comp, char *buf)
 
 struct zcomp_strm *zcomp_stream_get(struct zcomp *comp)
 {
+	if (IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE))
+		down(&comp->stream_limit);
 	return *get_cpu_ptr(comp->stream);
 }
 
 void zcomp_stream_put(struct zcomp *comp)
 {
 	put_cpu_ptr(comp->stream);
+	if (IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE))
+		up(&comp->stream_limit);
 }
 
 int zcomp_compress(struct zcomp_strm *zstrm,
@@ -193,6 +197,9 @@ int zcomp_cpu_dead(unsigned int cpu, struct hlist_node *node)
 static int zcomp_init(struct zcomp *comp)
 {
 	int ret;
+
+	sema_init(&comp->stream_limit,
+		  IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE) ? 6 : num_possible_cpus());
 
 	comp->stream = alloc_percpu(struct zcomp_strm *);
 	if (!comp->stream)
