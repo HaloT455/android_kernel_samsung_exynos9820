@@ -1,0 +1,58 @@
+name: ALice S10+ A75 2400 TEST1
+
+on:
+  push:
+    branches:
+      - agent/a75-2400-zram25-test1
+  workflow_dispatch:
+
+jobs:
+  build-beyond2lte:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            bc bison build-essential cpio curl flex libelf-dev libssl-dev python3 xz-utils
+
+      - name: Fetch pinned Android Clang
+        run: |
+          mkdir -p toolchain/clang-r547379
+          curl --fail --location \
+            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz \
+            -o /tmp/clang-r547379.tar.gz
+          tar -xf /tmp/clang-r547379.tar.gz -C toolchain/clang-r547379
+          test -x toolchain/clang-r547379/bin/clang-20
+
+      - name: Restore full pinned KernelSU history
+        run: |
+          if [ "$(git -C KernelSU-Next rev-parse --is-shallow-repository)" = true ]; then
+            git -C KernelSU-Next fetch --unshallow --tags
+          fi
+          test "$(git -C KernelSU-Next rev-parse HEAD)" = fc33995cedc5e0ebf719745c71fe15e78694260f
+
+      - name: Build and verify Image
+        env:
+          CLANG_DIR: ${{ github.workspace }}/toolchain/clang-r547379
+          ALICE_OUT: out-alice-test1
+          JOBS: 8
+        run: |
+          scripts/alice_build.sh
+          cp out-alice-test1/arch/arm64/boot/Image ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image
+          sha256sum ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image > SHA256SUMS
+
+      - name: Upload kernel Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALice-S10Plus-A75-2400-ZRAM25-TEST1
+          path: |
+            ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image
+            SHA256SUMS
+          if-no-files-found: error
