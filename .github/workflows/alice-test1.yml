@@ -44,7 +44,7 @@ jobs:
           ALICE_OUT: out-alice-test1
           JOBS: 8
         run: |
-          scripts/alice_build.sh
+          bash scripts/alice_build.sh
           cp out-alice-test1/arch/arm64/boot/Image ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image
           sha256sum ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image > SHA256SUMS
 
