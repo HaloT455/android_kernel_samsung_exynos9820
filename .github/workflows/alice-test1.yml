@@ -25,9 +25,15 @@ jobs:
       - name: Fetch pinned Android Clang
         run: |
           mkdir -p toolchain/clang-r547379
-          curl --fail --location \
-            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz \
+          clang_url=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
+          curl --fail --location --retry 5 --retry-all-errors "$clang_url" \
             -o /tmp/clang-r547379.tar.gz
+          for attempt in 1 2 3; do
+            gzip -t /tmp/clang-r547379.tar.gz && break
+            curl --fail --location --retry 5 --retry-all-errors --continue-at - \
+              "$clang_url" -o /tmp/clang-r547379.tar.gz
+          done
+          gzip -t /tmp/clang-r547379.tar.gz
           tar -xf /tmp/clang-r547379.tar.gz -C toolchain/clang-r547379
           test -x toolchain/clang-r547379/bin/clang-20
 
