@@ -3048,13 +3048,14 @@ static ssize_t disksize_store(struct device *dev,
 	u64 disksize;
 	struct zcomp *comp;
 	struct zram *zram = dev_to_zram(dev);
+	bool alice_profile = IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE) &&
+			     zram->disk->first_minor == 0;
 	int err;
 
 	disksize = memparse(buf, NULL);
 	if (!disksize)
 		return -EINVAL;
-	if (IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE) &&
-	    zram->disk->first_minor == 0) {
+	if (alice_profile) {
 		disksize = 2560ULL * 1024 * 1024;
 		pr_info("ALice zram: forcing zram0 to 2.5GiB, ZSTD, six streams\n");
 	}
@@ -3065,6 +3066,9 @@ static ssize_t disksize_store(struct device *dev,
 		err = -EBUSY;
 		goto out_unlock;
 	}
+	/* Samsung userspace selects LZ4 before sizing zram; enforce this profile. */
+	if (alice_profile)
+		strlcpy(zram->compressor, "zstd", sizeof(zram->compressor));
 
 	disksize = PAGE_ALIGN(disksize);
 	if (!zram_meta_alloc(zram, disksize)) {

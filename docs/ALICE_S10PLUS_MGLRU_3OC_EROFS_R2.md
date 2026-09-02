@@ -7,7 +7,7 @@ experimental, device-specific boot image and has not been validated on phone.
 | --- | --- |
 | Reclaim | Multi-Gen LRU is built in and enabled by default. |
 | Android memory killer | PSI and MEMCG remain enabled for userspace `lmkd`; the legacy in-kernel Android LMK is disabled. |
-| ZRAM | `zram0` is forced to 2560 MiB when userspace initializes it, defaults to ZSTD, permits six concurrent compression/decompression operations, and has no writeback path. |
+| ZRAM | `zram0` is forced to 2560 MiB and ZSTD when userspace initializes it, permits six concurrent compression/decompression operations, and has no writeback path. |
 | Filesystem | EROFS is built in with compressed-file support, xattrs, POSIX ACLs and security labels. Existing EROFS/ext4 fstab fallback entries are preserved; no partition is reformatted. |
 | CPU0-3 | Requests the exact firmware CAL OPP at 2,106,000 kHz. |
 | CPU4-5 | Requests the exact firmware CAL OPP at 2,400,000 kHz. |
