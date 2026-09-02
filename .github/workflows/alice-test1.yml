@@ -20,12 +20,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            bc bison build-essential cpio curl flex libelf-dev libssl-dev python3 xz-utils clang lld
+            bc bison build-essential cpio curl flex libelf-dev libssl-dev python3 xz-utils clang lld llvm
 
       - name: Verify LLVM toolchain
         run: |
           clang --version
           ld.lld --version
+          llvm-ar --version
+          llvm-nm --version
 
       - name: Restore full pinned KernelSU history
         run: |
