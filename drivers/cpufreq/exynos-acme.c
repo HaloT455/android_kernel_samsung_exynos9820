@@ -1327,6 +1327,7 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 	unsigned int *volt_table = NULL;
 	unsigned int index;
 	int ret;
+	unsigned int alice_oc_target = 0;
 
 	mutex_init(&domain->lock);
 
@@ -1347,17 +1348,25 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 	if (!of_property_read_u32(dn, "min-freq", &val))
 		domain->min_freq = max(domain->min_freq, val);
 
-	/*
-	 * CPU4-5's Exynos9820 CAL table contains a firmware-provided 2.4GHz
-	 * OPP which the normal-version limit hides. Enable only that exact OPP
-	 * after independently validating the DT ceiling, rate and ASV voltage.
-	 * Keep the stock ceiling on every allocation or validation failure.
-	 */
-	if (IS_ENABLED(CONFIG_ALICE_A75_2400) &&
-	    cpumask_weight(&domain->cpus) == 2 &&
-	    cpumask_test_cpu(4, &domain->cpus) &&
-	    cpumask_test_cpu(5, &domain->cpus) &&
-	    dt_max_freq >= 2400000) {
+	if (IS_ENABLED(CONFIG_ALICE_EXYNOS9820_3CLUSTER_OC)) {
+		if (cpumask_weight(&domain->cpus) == 4 &&
+		    cpumask_test_cpu(0, &domain->cpus) &&
+		    cpumask_test_cpu(1, &domain->cpus) &&
+		    cpumask_test_cpu(2, &domain->cpus) &&
+		    cpumask_test_cpu(3, &domain->cpus))
+			alice_oc_target = 2106000;
+		else if (cpumask_weight(&domain->cpus) == 2 &&
+			 cpumask_test_cpu(4, &domain->cpus) &&
+			 cpumask_test_cpu(5, &domain->cpus))
+			alice_oc_target = 2400000;
+		else if (cpumask_weight(&domain->cpus) == 2 &&
+			 cpumask_test_cpu(6, &domain->cpus) &&
+			 cpumask_test_cpu(7, &domain->cpus))
+			alice_oc_target = 2912000;
+	}
+
+	/* Enable only an exact rate with a firmware-provided ASV voltage. */
+	if (alice_oc_target) {
 		rate_table = kcalloc(domain->table_size, sizeof(*rate_table),
 				     GFP_KERNEL);
 		volt_table = kcalloc(domain->table_size, sizeof(*volt_table),
@@ -1366,17 +1375,19 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 			cal_dfs_get_rate_table(domain->cal_id, rate_table);
 			cal_dfs_get_asv_table(domain->cal_id, volt_table);
 			for (index = 0; index < domain->table_size; index++) {
-				if (rate_table[index] != 2400000 ||
+				if (rate_table[index] != alice_oc_target ||
 				    !volt_table[index])
 					continue;
-				domain->max_freq = 2400000;
-				pr_info("ALice A75: enabled verified 2400000 kHz OPP at %u uV\n",
-					volt_table[index]);
+				domain->max_freq = alice_oc_target;
+				pr_info("ALice OC: CPUs %*pbl enabled %u kHz at %u uV (DT max %u)\n",
+					cpumask_pr_args(&domain->cpus), alice_oc_target,
+					volt_table[index], dt_max_freq);
 				break;
 			}
 		}
-		if (domain->max_freq != 2400000)
-			pr_warn("ALice A75: 2.4GHz validation failed; retaining %u kHz\n",
+		if (domain->max_freq != alice_oc_target)
+			pr_warn("ALice OC: CPUs %*pbl rejected %u kHz; retaining %u kHz\n",
+				cpumask_pr_args(&domain->cpus), alice_oc_target,
 				domain->max_freq);
 		kfree(volt_table);
 		kfree(rate_table);

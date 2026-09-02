@@ -1,9 +1,9 @@
-name: ALice S10+ A75 2400 TEST1
+name: ALice S10+ MGLRU 3OC EROFS R2 TEST
 
 on:
   push:
     branches:
-      - agent/a75-2400-zram25-test1
+      - agent/mglru-oc-all-erofs-r2
   workflow_dispatch:
 
 jobs:
@@ -47,18 +47,18 @@ jobs:
       - name: Build and verify Image
         env:
           CLANG_DIR: ${{ github.workspace }}/toolchain/clang-r547379
-          ALICE_OUT: out-alice-test1
+          ALICE_OUT: out-alice-r2
           JOBS: 8
         run: |
           bash scripts/alice_build.sh
-          cp out-alice-test1/arch/arm64/boot/Image ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image
-          sha256sum ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image > SHA256SUMS
+          cp out-alice-r2/arch/arm64/boot/Image ALice_S10Plus_MGLRU_3OC_EROFS_R2_TEST_Image
+          sha256sum ALice_S10Plus_MGLRU_3OC_EROFS_R2_TEST_Image > SHA256SUMS
 
       - name: Upload kernel Image
         uses: actions/upload-artifact@v4
         with:
-          name: ALice-S10Plus-A75-2400-ZRAM25-TEST1
+          name: ALice-S10Plus-MGLRU-3OC-EROFS-R2-TEST
           path: |
-            ALice_S10Plus_A75_2400_ZRAM25_TEST1_Image
+            ALice_S10Plus_MGLRU_3OC_EROFS_R2_TEST_Image
             SHA256SUMS
           if-no-files-found: error

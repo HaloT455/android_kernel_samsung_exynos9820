@@ -29,13 +29,13 @@ config ALICE_EAS_BALANCED
 	  emergency trips, hotplug protection, GPU, battery and charging rules.
 	  This is an experimental device profile requiring hardware testing.
 
-config ALICE_A75_2400
-	bool "ALice enable verified Exynos9820 A75 2.4GHz OPP"
+config ALICE_EXYNOS9820_3CLUSTER_OC
+	bool "ALice enable verified Exynos9820 three-cluster OPPs"
 	depends on ALICE_EAS_BALANCED && SOC_EXYNOS9820
 	default n
 	help
-	  Raise only the CPU4-5 policy ceiling to 2400000 kHz when the
-	  device tree permits that ceiling and CAL supplies an exact 2.4GHz
-	  rate with a non-zero ASV voltage. No frequency or voltage table is
-	  imported from another SoC. The stock ceiling is retained if any
-	  validation fails.
+	  Raise CPU0-3 to 2106000 kHz, CPU4-5 to 2400000 kHz and CPU6-7 to
+	  2912000 kHz only when the Exynos9820 CAL table supplies the exact
+	  rate and a non-zero ASV voltage. No frequency or voltage table is
+	  imported from another SoC. Each cluster retains its stock ceiling
+	  independently if validation fails. This is experimental.
