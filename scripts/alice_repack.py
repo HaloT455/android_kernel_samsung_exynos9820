@@ -86,7 +86,7 @@ def main():
     header, parts = unpack_boot(original)
     assert header[576:608] == boot_id(parts), "Original boot ID mismatch"
     assert kernel[56:60] == b"ARMd"
-    assert b"-ALice-S10P-UI1-EAS65-R1" in kernel
+    assert b"-ALice-S10P-MGLRU-3OC-EROFS-R2-TEST" in kernel
     records = cpio_read(gzip.decompress(parts[1]))
     by_name = {name: (name, fields, data) for name, fields, data in records}
     assert len(by_name) == len(records)
