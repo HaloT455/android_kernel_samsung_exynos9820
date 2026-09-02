@@ -20,22 +20,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            bc bison build-essential cpio curl flex libelf-dev libssl-dev python3 xz-utils
+            bc bison build-essential cpio curl flex libelf-dev libssl-dev python3 xz-utils clang lld
 
-      - name: Fetch pinned Android Clang
+      - name: Verify LLVM toolchain
         run: |
-          mkdir -p toolchain/clang-r547379
-          clang_url=https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
-          curl --fail --location --retry 5 --retry-all-errors "$clang_url" \
-            -o /tmp/clang-r547379.tar.gz
-          for attempt in 1 2 3; do
-            gzip -t /tmp/clang-r547379.tar.gz && break
-            curl --fail --location --retry 5 --retry-all-errors --continue-at - \
-              "$clang_url" -o /tmp/clang-r547379.tar.gz
-          done
-          gzip -t /tmp/clang-r547379.tar.gz
-          tar -xf /tmp/clang-r547379.tar.gz -C toolchain/clang-r547379
-          test -x toolchain/clang-r547379/bin/clang-20
+          clang --version
+          ld.lld --version
 
       - name: Restore full pinned KernelSU history
         run: |
@@ -46,7 +36,7 @@ jobs:
 
       - name: Build and verify Image
         env:
-          CLANG_DIR: ${{ github.workspace }}/toolchain/clang-r547379
+          CLANG_DIR: /usr
           ALICE_OUT: out-alice-r2
           JOBS: 8
         run: |
