@@ -1,0 +1,180 @@
+name: ALice S10+ MGLRU ZSTD65 SUSFS V5 TEST
+
+on:
+  push:
+    branches:
+      - agent/beyond2lte-mglru-zstd65-susfs-v5
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-beyond2lte:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            bc bison build-essential cpio curl flex libelf-dev libssl-dev \
+            python3 xz-utils clang lld llvm
+
+      - name: Import isolated MGLRU ZRAM and 65C source delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            agent/mglru-oc-all-erofs-r2:refs/remotes/origin/alice-mglru-r2
+
+          mglru_paths=(
+            fs/exec.c
+            fs/fuse/dev.c
+            include/linux/cgroup.h
+            include/linux/memcontrol.h
+            include/linux/mm.h
+            include/linux/mm_inline.h
+            include/linux/mm_types.h
+            include/linux/mmzone.h
+            include/linux/page-flags-layout.h
+            include/linux/page-flags.h
+            include/linux/sched.h
+            include/linux/swap.h
+            kernel/bounds.c
+            kernel/cgroup/cgroup-internal.h
+            kernel/exit.c
+            kernel/fork.c
+            kernel/sched/core.c
+            mm/Kconfig
+            mm/huge_memory.c
+            mm/memcontrol.c
+            mm/memory.c
+            mm/mm_init.c
+            mm/mmzone.c
+            mm/page_alloc.c
+            mm/pagewalk.c
+            mm/rmap.c
+            mm/swap.c
+            mm/swap_state.c
+            mm/swapfile.c
+            mm/vmscan.c
+            mm/workingset.c
+          )
+
+          git diff --binary \
+            fc52ed4ea24c7e965dab4a75666210809b67f34a \
+            c98dadd5ddaaa671db46138d07258de4de6379cd \
+            -- "${mglru_paths[@]}" > "$RUNNER_TEMP/alice-mglru.patch"
+          git apply --3way --whitespace=nowarn "$RUNNER_TEMP/alice-mglru.patch"
+
+          git diff --binary \
+            8af1b291a1d9bb445f5fa831fe299ed3a2e7f766 \
+            c98dadd5ddaaa671db46138d07258de4de6379cd \
+            -- drivers/block/zram/Kconfig drivers/block/zram/zcomp.c \
+               drivers/block/zram/zcomp.h drivers/block/zram/zram_drv.c \
+            > "$RUNNER_TEMP/alice-zram.patch"
+          git apply --3way --whitespace=nowarn "$RUNNER_TEMP/alice-zram.patch"
+
+          git diff --binary \
+            5ae7dac3c4e0fb8e02dfcb9a63eaea47c5848114 \
+            8af1b291a1d9bb445f5fa831fe299ed3a2e7f766 \
+            -- drivers/thermal/samsung/Kconfig \
+               drivers/thermal/samsung/exynos_tmu.c \
+            > "$RUNNER_TEMP/alice-thermal.patch"
+          git apply --3way --whitespace=nowarn "$RUNNER_TEMP/alice-thermal.patch"
+
+          grep -q '^config LRU_GEN$' mm/Kconfig
+          grep -q 'lru_gen_use_mm(mm)' kernel/sched/core.c
+          grep -q 'forcing zram0 to 2.5GiB' drivers/block/zram/zram_drv.c
+          grep -q 'const int onset = 65000' drivers/thermal/samsung/exynos_tmu.c
+          git diff --check
+          git status --short
+
+      - name: Verify KernelSU and requested config
+        run: |
+          test "$(git -C KernelSU-Next rev-parse HEAD)" = fd093e8b879063aeb0192a3959b0652101ded623
+          git apply --check --directory=KernelSU-Next .github/alice-ksunext-susfs-v2.2.patch
+          git apply --directory=KernelSU-Next .github/alice-ksunext-susfs-v2.2.patch
+          git apply --check --directory=KernelSU-Next .github/alice-ksu-devpts-compat.patch
+          git apply --directory=KernelSU-Next .github/alice-ksu-devpts-compat.patch
+          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_LRU_GEN=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^# CONFIG_ZRAM_WRITEBACK is not set$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' arch/arm64/configs/ksu.config
+
+      - name: Build beyond2lte with KernelSU
+        run: |
+          chmod +x build.sh
+          ./build.sh -m beyond2lte -k y -r n
+
+      - name: Verify outputs and final config
+        run: |
+          test -s out/arch/arm64/boot/Image
+          test -s build/out/beyond2lte/boot.img
+          test -s build/out/beyond2lte/dtbo.img
+          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' out/.config
+          grep -q '^CONFIG_LRU_GEN=y$' out/.config
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y$' out/.config
+          grep -q '^# CONFIG_LRU_GEN_STATS is not set$' out/.config
+          grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' out/.config
+          grep -q '^# CONFIG_ZRAM_WRITEBACK is not set$' out/.config
+          grep -q '^CONFIG_CRYPTO_ZSTD=y$' out/.config
+          grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' out/.config
+          grep -q '^CONFIG_KSU=y$' out/.config
+          grep -q '^CONFIG_KSU_SUSFS=y$' out/.config
+          grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' out/.config
+          grep -q '^CONFIG_EROFS_FS=y$' out/.config
+          grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
+          grep -q '^CONFIG_PSI=y$' out/.config
+          sha256sum out/arch/arm64/boot/Image \
+            build/out/beyond2lte/boot.img build/out/beyond2lte/dtbo.img
+
+      - name: Commit verified V5 source integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ALice Kernel CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            fs/exec.c fs/fuse/dev.c \
+            include/linux/cgroup.h include/linux/memcontrol.h include/linux/mm.h \
+            include/linux/mm_inline.h include/linux/mm_types.h include/linux/mmzone.h \
+            include/linux/page-flags-layout.h include/linux/page-flags.h \
+            include/linux/sched.h include/linux/swap.h \
+            kernel/bounds.c kernel/cgroup/cgroup-internal.h kernel/exit.c \
+            kernel/fork.c kernel/sched/core.c \
+            mm/Kconfig mm/huge_memory.c mm/memcontrol.c mm/memory.c \
+            mm/mm_init.c mm/mmzone.c mm/page_alloc.c mm/pagewalk.c mm/rmap.c \
+            mm/swap.c mm/swap_state.c mm/swapfile.c mm/vmscan.c mm/workingset.c \
+            drivers/block/zram/Kconfig drivers/block/zram/zcomp.c \
+            drivers/block/zram/zcomp.h drivers/block/zram/zram_drv.c \
+            drivers/thermal/samsung/Kconfig drivers/thermal/samsung/exynos_tmu.c
+          git diff --cached --check
+          git commit -m "beyond2lte: add MGLRU ZSTD 2.5GiB and 65C thermal V5"
+          git push origin HEAD:agent/beyond2lte-mglru-zstd65-susfs-v5
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p alice-v5-artifacts
+          cp out/arch/arm64/boot/Image alice-v5-artifacts/ALice_S10Plus_MGLRU_ZSTD65_SUSFS_V5_TEST_Image
+          cp build/out/beyond2lte/boot.img alice-v5-artifacts/ALice_S10Plus_MGLRU_ZSTD65_SUSFS_V5_REPO_BOOT.img
+          cp build/out/beyond2lte/dtbo.img alice-v5-artifacts/ALice_S10Plus_MGLRU_ZSTD65_SUSFS_V5_REPO_DTBO.img
+          cp out/.config alice-v5-artifacts/ALice_S10Plus_MGLRU_ZSTD65_SUSFS_V5.config
+          cp docs/ALICE_S10PLUS_MGLRU_ZSTD65_SUSFS_V5.md alice-v5-artifacts/
+          sha256sum alice-v5-artifacts/* > alice-v5-artifacts/SHA256SUMS
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALice-S10Plus-MGLRU-ZSTD65-SUSFS-V5-TEST
+          path: alice-v5-artifacts/
+          if-no-files-found: error
