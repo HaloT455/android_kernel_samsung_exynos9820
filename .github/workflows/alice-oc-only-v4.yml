@@ -1,0 +1,65 @@
+name: ALice S10+ OC-only V4 TEST
+
+on:
+  push:
+    branches:
+      - agent/beyond2lte-oc-only-v4
+  workflow_dispatch:
+
+jobs:
+  build-beyond2lte:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            bc bison build-essential cpio curl flex libelf-dev libssl-dev \
+            python3 xz-utils clang lld llvm
+
+      - name: Verify diagnostic delta
+        run: |
+          test "$(git -C KernelSU-Next rev-parse HEAD)" = f88c869e39d623eaf90154c71a08339379439181
+          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^# CONFIG_KSU_SUSFS is not set$' arch/arm64/configs/ksu.config
+          ! grep -q '^CONFIG_LRU_GEN=y$' arch/arm64/configs/exynos9820_defconfig
+
+      - name: Build beyond2lte with KernelSU
+        run: |
+          chmod +x build.sh
+          ./build.sh -m beyond2lte -k y -r n
+
+      - name: Verify outputs and config
+        run: |
+          test -s out/arch/arm64/boot/Image
+          test -s build/out/beyond2lte/boot.img
+          test -s build/out/beyond2lte/dtbo.img
+          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' out/.config
+          grep -q '^CONFIG_KSU=y$' out/.config
+          grep -q '^CONFIG_EROFS_FS=y$' out/.config
+          grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
+          grep -q '^CONFIG_PSI=y$' out/.config
+          sha256sum out/arch/arm64/boot/Image build/out/beyond2lte/boot.img build/out/beyond2lte/dtbo.img
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p alice-v4-artifacts
+          cp out/arch/arm64/boot/Image alice-v4-artifacts/ALice_S10Plus_OC_ONLY_V4_TEST_Image
+          cp build/out/beyond2lte/boot.img alice-v4-artifacts/ALice_S10Plus_OC_ONLY_V4_REPO_BOOT.img
+          cp build/out/beyond2lte/dtbo.img alice-v4-artifacts/ALice_S10Plus_OC_ONLY_V4_REPO_DTBO.img
+          cp out/.config alice-v4-artifacts/ALice_S10Plus_OC_ONLY_V4.config
+          cp docs/ALICE_S10PLUS_OC_ONLY_V4.md alice-v4-artifacts/
+          sha256sum alice-v4-artifacts/* > alice-v4-artifacts/SHA256SUMS
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALice-S10Plus-OC-ONLY-V4-TEST
+          path: alice-v4-artifacts/
+          if-no-files-found: error
