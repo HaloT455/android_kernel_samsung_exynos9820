@@ -1310,6 +1310,10 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 					struct device_node *dn)
 {
 	unsigned int val;
+	unsigned int alice_oc_target = 0;
+	unsigned int index;
+	unsigned int stock_max_freq;
+	unsigned long *rate_table = NULL;
 	int ret;
 
 	mutex_init(&domain->lock);
@@ -1328,6 +1332,55 @@ static __init int init_domain(struct exynos_cpufreq_domain *domain,
 		domain->max_freq = min(domain->max_freq, val);
 	if (!of_property_read_u32(dn, "min-freq", &val))
 		domain->min_freq = max(domain->min_freq, val);
+
+	stock_max_freq = domain->max_freq;
+
+	/*
+	 * V4 diagnostic profile: expose only exact rates already supplied by
+	 * Exynos CAL.  Do not read, write, offset or replace the ASV voltage
+	 * table here; the unmodified firmware/stock driver remains its owner.
+	 */
+	if (IS_ENABLED(CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC)) {
+		if (cpumask_weight(&domain->cpus) == 4 &&
+		    cpumask_test_cpu(0, &domain->cpus) &&
+		    cpumask_test_cpu(1, &domain->cpus) &&
+		    cpumask_test_cpu(2, &domain->cpus) &&
+		    cpumask_test_cpu(3, &domain->cpus))
+			alice_oc_target = 2106000;
+		else if (cpumask_weight(&domain->cpus) == 2 &&
+			 cpumask_test_cpu(4, &domain->cpus) &&
+			 cpumask_test_cpu(5, &domain->cpus))
+			alice_oc_target = 2400000;
+		else if (cpumask_weight(&domain->cpus) == 2 &&
+			 cpumask_test_cpu(6, &domain->cpus) &&
+			 cpumask_test_cpu(7, &domain->cpus))
+			alice_oc_target = 2912000;
+	}
+
+	if (alice_oc_target > stock_max_freq) {
+		rate_table = kcalloc(domain->table_size, sizeof(*rate_table),
+				     GFP_KERNEL);
+		if (rate_table) {
+			cal_dfs_get_rate_table(domain->cal_id, rate_table);
+			for (index = 0; index < domain->table_size; index++) {
+				if (rate_table[index] != alice_oc_target)
+					continue;
+
+				domain->max_freq = alice_oc_target;
+				pr_info("ALice V4 OC: CPUs %*pbl enabled %u kHz; voltage table untouched\n",
+					cpumask_pr_args(&domain->cpus),
+					alice_oc_target);
+				break;
+			}
+		}
+
+		if (domain->max_freq != alice_oc_target)
+			pr_warn("ALice V4 OC: CPUs %*pbl lack exact %u kHz CAL rate; retaining %u kHz\n",
+				cpumask_pr_args(&domain->cpus),
+				alice_oc_target, stock_max_freq);
+
+		kfree(rate_table);
+	}
 
 	/* If this domain has boost freq, change max */
 	val = exynos_pstate_get_boost_freq(cpumask_first(&domain->cpus));

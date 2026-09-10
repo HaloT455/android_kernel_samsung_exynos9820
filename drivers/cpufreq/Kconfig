@@ -404,5 +404,15 @@ config EXYNOS_PSTATE_MODE_CHANGER
 
 endchoice
 
+config ALICE_EXYNOS9820_FREQ_ONLY_OC
+	bool "ALice Exynos9820 frequency-only overclock"
+	depends on ARCH_EXYNOS && ARM_EXYNOS_ACME
+	default n
+	help
+	  Raise only the CPUFreq policy ceiling when the requested exact rate
+	  already exists in the Exynos CAL firmware table.  This option does not
+	  add, replace or offset any voltage/ASV value.  Unsupported rates retain
+	  the stock ceiling.
+
 endif
 endmenu
