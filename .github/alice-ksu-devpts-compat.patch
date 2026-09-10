@@ -1,0 +1,39 @@
+diff --git a/kernel/feature/sucompat.c b/kernel/feature/sucompat.c
+--- a/kernel/feature/sucompat.c
++++ b/kernel/feature/sucompat.c
+@@ -243,6 +243,32 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
+ 	return 0;
+ }
+ 
++/*
++ * The Exynos 9820 tree still calls this legacy devpts hook from
++ * fs/devpts/inode.c.  Keep the hook as a compatibility shim for the
++ * current KernelSU-Next API; it only applies the existing cached KSU
++ * file SID to an allowed app inode and does not change credentials.
++ */
++int ksu_handle_devpts(struct inode *inode)
++{
++#ifndef KSU_KPROBES_HOOK
++	if (!ksu_su_compat_enabled)
++		return 0;
++#endif
++
++	if (!inode || !current->mm)
++		return 0;
++
++	if (current_uid().val % 100000 < 10000)
++		return 0;
++
++	if (!ksu_is_allow_uid_for_current(current_uid().val))
++		return 0;
++
++	{
++		struct inode_security_struct *sec = selinux_inode(inode);
++		if (ksu_file_sid && sec)
++			sec->sid = ksu_file_sid;
++	}
++	return 0;
++}
++
+ // sucompat: permitted process can execute 'su' to gain root access.
+ void __init ksu_sucompat_init()
