@@ -26,8 +26,8 @@ jobs:
       - name: Verify diagnostic delta
         run: |
           test "$(git -C KernelSU-Next rev-parse HEAD)" = fd093e8b879063aeb0192a3959b0652101ded623
-          git -C KernelSU-Next apply --check patches/alice-ksunext-susfs-v2.2.patch
-          git -C KernelSU-Next apply patches/alice-ksunext-susfs-v2.2.patch
+          git -C KernelSU-Next apply --check .github/alice-ksunext-susfs-v2.2.patch
+          git -C KernelSU-Next apply .github/alice-ksunext-susfs-v2.2.patch
           grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' arch/arm64/configs/beyond2lte.config
           grep -q '^CONFIG_KSU_SUSFS=y$' arch/arm64/configs/ksu.config
           ! grep -q '^CONFIG_LRU_GEN=y$' arch/arm64/configs/exynos9820_defconfig
