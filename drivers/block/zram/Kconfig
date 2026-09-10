@@ -15,6 +15,15 @@ config ZRAM
 
 	  See Documentation/blockdev/zram.txt for more information.
 
+config ALICE_ZRAM_PROFILE
+	bool "ALice 2.5GiB ZSTD zram with six concurrent streams"
+	depends on ZRAM && CRYPTO_ZSTD
+	default n
+	help
+	  Select ZSTD for new zram devices, force zram0 to 2.5GiB when
+	  userspace initializes it, and cap simultaneous compression or
+	  decompression operations at six. Other zram devices are unchanged.
+
 config ZRAM_WRITEBACK
        bool "Write back incompressible or idle page to backing device"
        depends on ZRAM
