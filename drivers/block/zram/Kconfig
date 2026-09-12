@@ -16,11 +16,11 @@ config ZRAM
 	  See Documentation/blockdev/zram.txt for more information.
 
 config ALICE_ZRAM_PROFILE
-	bool "ALice 2.5GiB ZSTD zram with six concurrent streams"
+	bool "ALice 4GiB ZSTD zram with six concurrent streams"
 	depends on ZRAM && CRYPTO_ZSTD
 	default n
 	help
-	  Select ZSTD for new zram devices, force zram0 to 2.5GiB when
+	  Select ZSTD for new zram devices, force zram0 to 4GiB when
 	  userspace initializes it, and cap simultaneous compression or
 	  decompression operations at six. Other zram devices are unchanged.
 

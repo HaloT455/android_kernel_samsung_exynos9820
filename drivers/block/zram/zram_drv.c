@@ -3056,8 +3056,8 @@ static ssize_t disksize_store(struct device *dev,
 	if (!disksize)
 		return -EINVAL;
 	if (alice_profile) {
-		disksize = 2560ULL * 1024 * 1024;
-		pr_info("ALice zram: forcing zram0 to 2.5GiB, ZSTD, six streams\n");
+		disksize = 4096ULL * 1024 * 1024;
+		pr_info("ALice zram: forcing zram0 to 4GiB, ZSTD, six streams\n");
 	}
 
 	down_write(&zram->init_lock);
