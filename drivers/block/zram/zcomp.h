@@ -10,6 +10,8 @@
 #ifndef _ZCOMP_H_
 #define _ZCOMP_H_
 
+#include <linux/semaphore.h>
+
 struct zcomp_strm {
 	/* compression/decompression buffer */
 	void *buffer;
@@ -21,6 +23,7 @@ struct zcomp {
 	struct zcomp_strm * __percpu *stream;
 	const char *name;
 	struct hlist_node node;
+	struct semaphore stream_limit;
 };
 
 int zcomp_cpu_up_prepare(unsigned int cpu, struct hlist_node *node);

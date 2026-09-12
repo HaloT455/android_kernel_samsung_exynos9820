@@ -1570,6 +1570,70 @@ static int exynos_tmu_parse_ect(struct exynos_tmu_data *data)
 struct exynos_tmu_data *gpu_thermal_data;
 #endif
 
+/* Apply after ECT: firmware would otherwise overwrite a DT-only change. */
+static void exynos_tmu_cpu_cooling_onset(struct exynos_tmu_data *data)
+{
+	struct thermal_zone_device *tz = data->tzd;
+	struct __thermal_zone *zone = tz->devdata;
+	const int onset = 65000;
+	int i, count, last_active = -1;
+	unsigned long full_freq;
+	bool first_limit = true;
+
+	if (!IS_ENABLED(CONFIG_ALICE_EAS_BALANCED) || !zone || !tz->tzp)
+		return;
+	if (strcmp(tz->type, "BIG") && strcmp(tz->type, "MID") &&
+	    strcmp(tz->type, "LITTLE"))
+		return;
+
+	count = min(tz->trips, zone->ntrips);
+	if (!strcmp(tz->tzp->governor_name, "power_allocator")) {
+		/* Match the native allocator's first passive / preceding active pair. */
+		for (i = 0; i < count; i++) {
+			struct thermal_trip *trip = &zone->trips[i];
+
+			if (trip->type == THERMAL_TRIP_PASSIVE) {
+				if (last_active < 0 || trip->temperature <= onset)
+					return;
+				zone->trips[last_active].temperature = onset;
+				zone->trips[last_active].hysteresis = 0;
+				dev_info(&tz->device, "%s: CPU cooling onset 65C, target %dC\n",
+					 tz->type, trip->temperature / 1000);
+				return;
+			}
+			if (trip->type != THERMAL_TRIP_ACTIVE)
+				break;
+			last_active = i;
+		}
+		return;
+	}
+
+	/* LITTLE's ECT frequency table: keep caps and higher safety trips. */
+	if (!zone->num_tbps || !zone->tbps || !zone->tbps[0].value)
+		return;
+	full_freq = zone->tbps[0].value;
+	for (i = 0; i < zone->num_tbps; i++) {
+		struct __thermal_bind_params *binding = &zone->tbps[i];
+		struct thermal_trip *trip;
+
+		if (binding->trip_id >= count || !binding->value ||
+		    binding->value >= full_freq)
+			continue;
+		trip = &zone->trips[binding->trip_id];
+		if (trip->type != THERMAL_TRIP_ACTIVE &&
+		    trip->type != THERMAL_TRIP_PASSIVE)
+			continue;
+		if (first_limit || trip->temperature < onset) {
+			trip->temperature = onset;
+			trip->hysteresis = 0;
+		}
+		first_limit = false;
+	}
+	if (!first_limit)
+		dev_info(&tz->device, "%s: first CPU frequency cap starts at 65C\n",
+			 tz->type);
+}
+
 static int exynos_tmu_probe(struct platform_device *pdev)
 {
 	struct exynos_tmu_data *data;
@@ -1616,6 +1680,7 @@ static int exynos_tmu_probe(struct platform_device *pdev)
 #if defined(CONFIG_ECT)
 	exynos_tmu_parse_ect(data);
 #endif
+	exynos_tmu_cpu_cooling_onset(data);
 
 	data->num_probe = (readl(data->base + EXYNOS_TMU_REG_CONTROL1) >> EXYNOS_TMU_NUM_PROBE_SHIFT)
 				& EXYNOS_TMU_NUM_PROBE_MASK;

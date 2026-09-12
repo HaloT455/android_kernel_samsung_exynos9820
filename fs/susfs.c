@@ -606,6 +606,71 @@ out_spoof_kstat:
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 
+/* try_umount compatibility retained for the non-GKI 4.14 bridge */
+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+static DEFINE_MUTEX(susfs_mutex_lock_try_umount);
+extern void try_umount(const char *mnt, int flags);
+static LIST_HEAD(LH_TRY_UMOUNT_PATH);
+
+void susfs_add_try_umount(void __user **user_info)
+{
+	struct st_susfs_try_umount info = {0};
+	struct st_susfs_try_umount_list *new_list = NULL;
+
+	if (copy_from_user(&info,
+			   (struct st_susfs_try_umount __user *)*user_info,
+			   sizeof(info))) {
+		info.err = -EFAULT;
+		goto out_copy_to_user;
+	}
+	info.target_pathname[SUSFS_MAX_LEN_PATHNAME - 1] = '\0';
+
+	if (info.mnt_mode == TRY_UMOUNT_DEFAULT)
+		info.mnt_mode = 0;
+	else if (info.mnt_mode == TRY_UMOUNT_DETACH)
+		info.mnt_mode = MNT_DETACH;
+	else {
+		SUSFS_LOGE("Unsupported mnt_mode: %d\\n", info.mnt_mode);
+		info.err = -EINVAL;
+		goto out_copy_to_user;
+	}
+
+	new_list = kzalloc(sizeof(*new_list), GFP_KERNEL);
+	if (!new_list) {
+		info.err = -ENOMEM;
+		goto out_copy_to_user;
+	}
+
+	memcpy(&new_list->info, &info, sizeof(info));
+	INIT_LIST_HEAD(&new_list->list);
+	mutex_lock(&susfs_mutex_lock_try_umount);
+	list_add_tail(&new_list->list, &LH_TRY_UMOUNT_PATH);
+	mutex_unlock(&susfs_mutex_lock_try_umount);
+	SUSFS_LOGI("target_pathname: '%s', umount options: %d, added\\n",
+		   new_list->info.target_pathname, new_list->info.mnt_mode);
+	info.err = 0;
+
+out_copy_to_user:
+	if (copy_to_user(&((struct st_susfs_try_umount __user *)*user_info)->err,
+			 &info.err, sizeof(info.err)))
+		info.err = -EFAULT;
+	SUSFS_LOGI("CMD_SUSFS_ADD_TRY_UMOUNT -> ret: %d\\n", info.err);
+}
+
+void susfs_try_umount(uid_t uid)
+{
+	struct st_susfs_try_umount_list *cursor = NULL;
+
+	mutex_lock(&susfs_mutex_lock_try_umount);
+	list_for_each_entry_reverse(cursor, &LH_TRY_UMOUNT_PATH, list) {
+		SUSFS_LOGI("umounting '%s' for uid: %u\\n",
+			   cursor->info.target_pathname, uid);
+		try_umount(cursor->info.target_pathname, cursor->info.mnt_mode);
+	}
+	mutex_unlock(&susfs_mutex_lock_try_umount);
+}
+#endif
+
 /* spoof_uname */
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 static struct st_susfs_uname my_uname = {0};

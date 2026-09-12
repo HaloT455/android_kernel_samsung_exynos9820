@@ -58,7 +58,9 @@ static DEFINE_IDR(zram_index_idr);
 static DEFINE_MUTEX(zram_index_mutex);
 
 static int zram_major;
-#if IS_ENABLED(CONFIG_CRYPTO_LZ4)
+#if IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE)
+static const char *default_compressor = "zstd";
+#elif IS_ENABLED(CONFIG_CRYPTO_LZ4)
 static const char *default_compressor = "lz4";
 #else
 static const char *default_compressor = "lzo";
@@ -2170,7 +2172,8 @@ static void zram_debugfs_unregister(struct zram *zram) {};
 static ssize_t max_comp_streams_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", num_online_cpus());
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+		IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE) ? 6 : num_online_cpus());
 }
 
 static ssize_t max_comp_streams_store(struct device *dev,
@@ -3045,11 +3048,17 @@ static ssize_t disksize_store(struct device *dev,
 	u64 disksize;
 	struct zcomp *comp;
 	struct zram *zram = dev_to_zram(dev);
+	bool alice_profile = IS_ENABLED(CONFIG_ALICE_ZRAM_PROFILE) &&
+			     zram->disk->first_minor == 0;
 	int err;
 
 	disksize = memparse(buf, NULL);
 	if (!disksize)
 		return -EINVAL;
+	if (alice_profile) {
+		disksize = 2560ULL * 1024 * 1024;
+		pr_info("ALice zram: forcing zram0 to 2.5GiB, ZSTD, six streams\n");
+	}
 
 	down_write(&zram->init_lock);
 	if (init_done(zram)) {
@@ -3057,6 +3066,9 @@ static ssize_t disksize_store(struct device *dev,
 		err = -EBUSY;
 		goto out_unlock;
 	}
+	/* Samsung userspace selects LZ4 before sizing zram; enforce this profile. */
+	if (alice_profile)
+		strlcpy(zram->compressor, "zstd", sizeof(zram->compressor));
 
 	disksize = PAGE_ALIGN(disksize);
 	if (!zram_meta_alloc(zram, disksize)) {
