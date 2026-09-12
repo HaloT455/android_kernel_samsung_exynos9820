@@ -1,0 +1,106 @@
+name: ALice S10+ V7 longuirom KSU + MGLRU + ZRAM4G
+
+on:
+  push:
+    branches:
+      - agent/beyond2lte-v7-longuirom-mglru-zram4g
+  workflow_dispatch:
+
+jobs:
+  build-beyond2lte-v7:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout V7 without the old KSU submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            bc bison build-essential cpio curl flex libelf-dev libssl-dev \
+            python3 xz-utils clang lld llvm
+
+      - name: Pin longuirom KernelSU fork and apply the SUSFS bridge
+        run: |
+          git clone --branch fork --single-branch https://github.com/longuirom/KernelSU.git KernelSU-Longui
+          git -C KernelSU-Longui checkout --detach b7d830918d863eaa88581fc88114065cc2d3e6b4
+          test "$(git -C KernelSU-Longui rev-parse HEAD)" = b7d830918d863eaa88581fc88114065cc2d3e6b4
+          cp -a .github/v7-longuirom-overlay/kernel/. KernelSU-Longui/kernel/
+          rm drivers/kernelsu
+          ln -s ../KernelSU-Longui/kernel drivers/kernelsu
+          test "$(readlink drivers/kernelsu)" = ../KernelSU-Longui/kernel
+          grep -q 'KSU_VERSION=32628' KernelSU-Longui/kernel/Makefile
+          grep -q 'config KSU_SUSFS' KernelSU-Longui/kernel/Kconfig
+          grep -q 'susfs_init();' KernelSU-Longui/kernel/ksu.c
+
+      - name: Verify V7 source profile
+        run: |
+          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_LRU_GEN=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^# CONFIG_LRU_GEN_STATS is not set$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_KSU_TAMPER_SYSCALL_TABLE=y$' arch/arm64/configs/ksu.config
+          grep -q '^# CONFIG_KSU_HACK_ARM64_BRANCH_LINK is not set$' arch/arm64/configs/ksu.config
+          grep -q '^# CONFIG_KSU_KPROBES_KSUD is not set$' arch/arm64/configs/ksu.config
+          grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' arch/arm64/configs/ksu.config
+          ! grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' arch/arm64/configs/ksu.config
+          grep -q '4096ULL \* 1024 \* 1024' drivers/block/zram/zram_drv.c
+          git diff --check
+
+      - name: Build beyond2lte V7
+        run: |
+          chmod +x build.sh
+          ./build.sh -m beyond2lte -k y -r n
+
+      - name: Verify kernel image, config and linked features
+        run: |
+          test -s out/arch/arm64/boot/Image
+          test -s out/vmlinux
+          test -s build/out/beyond2lte/boot.img
+          test -s build/out/beyond2lte/dtbo.img
+          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' out/.config
+          grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' out/.config
+          grep -q '^CONFIG_LRU_GEN=y$' out/.config
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y$' out/.config
+          grep -q '^# CONFIG_LRU_GEN_STATS is not set$' out/.config
+          grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' out/.config
+          grep -q '^CONFIG_CRYPTO_ZSTD=y$' out/.config
+          grep -q '^# CONFIG_ZRAM_WRITEBACK is not set$' out/.config
+          grep -q '^# CONFIG_ZRAM_LRU_WRITEBACK is not set$' out/.config
+          grep -q '^CONFIG_KSU=y$' out/.config
+          grep -q '^CONFIG_KSU_TAMPER_SYSCALL_TABLE=y$' out/.config
+          grep -q '^# CONFIG_KSU_HACK_ARM64_BRANCH_LINK is not set$' out/.config
+          grep -q '^# CONFIG_KSU_KPROBES_KSUD is not set$' out/.config
+          grep -q '^CONFIG_KSU_SUSFS=y$' out/.config
+          grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' out/.config
+          grep -q '^CONFIG_EROFS_FS=y$' out/.config
+          grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
+          grep -q '^CONFIG_PSI=y$' out/.config
+          nm out/vmlinux | grep -q ' susfs_init$'
+          nm out/vmlinux | grep -q ' susfs_try_umount$'
+          nm out/vmlinux | grep -q ' try_umount$'
+          nm out/vmlinux | grep -q ' lru_gen_init_lruvec$'
+          sha256sum out/arch/arm64/boot/Image build/out/beyond2lte/boot.img build/out/beyond2lte/dtbo.img
+
+      - name: Collect V7 artifacts
+        run: |
+          mkdir -p alice-v7-artifacts
+          cp out/arch/arm64/boot/Image alice-v7-artifacts/ALice_S10Plus_V7_TEST_Image
+          cp build/out/beyond2lte/boot.img alice-v7-artifacts/ALice_S10Plus_V7_REPO_BOOT.img
+          cp build/out/beyond2lte/dtbo.img alice-v7-artifacts/ALice_S10Plus_V7_REPO_DTBO.img
+          cp out/.config alice-v7-artifacts/ALice_S10Plus_V7.config
+          cp docs/ALICE_S10PLUS_V7.md alice-v7-artifacts/
+          sha256sum alice-v7-artifacts/* > alice-v7-artifacts/SHA256SUMS
+
+      - name: Upload V7 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALice-S10Plus-V7-TEST
+          path: alice-v7-artifacts/
+          if-no-files-found: error
