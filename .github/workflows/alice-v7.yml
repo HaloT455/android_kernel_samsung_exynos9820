@@ -72,20 +72,22 @@ jobs:
           grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' out/.config
           grep -q '^CONFIG_CRYPTO_ZSTD=y$' out/.config
           grep -q '^# CONFIG_ZRAM_WRITEBACK is not set$' out/.config
-          grep -q '^# CONFIG_ZRAM_LRU_WRITEBACK is not set$' out/.config
+          ! grep -q '^CONFIG_ZRAM_LRU_WRITEBACK=y$' out/.config
           grep -q '^CONFIG_KSU=y$' out/.config
           grep -q '^CONFIG_KSU_TAMPER_SYSCALL_TABLE=y$' out/.config
-          grep -q '^# CONFIG_KSU_HACK_ARM64_BRANCH_LINK is not set$' out/.config
-          grep -q '^# CONFIG_KSU_KPROBES_KSUD is not set$' out/.config
+          ! grep -q '^CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y$' out/.config
+          ! grep -q '^CONFIG_KSU_KPROBES_KSUD=y$' out/.config
           grep -q '^CONFIG_KSU_SUSFS=y$' out/.config
           grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' out/.config
           grep -q '^CONFIG_EROFS_FS=y$' out/.config
-          grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
+          ! grep -q '^CONFIG_ANDROID_LOW_MEMORY_KILLER=y$' out/.config
           grep -q '^CONFIG_PSI=y$' out/.config
-          nm out/vmlinux | grep -q ' susfs_init$'
-          nm out/vmlinux | grep -q ' susfs_try_umount$'
-          nm out/vmlinux | grep -q ' try_umount$'
-          nm out/vmlinux | grep -q ' lru_gen_init_lruvec$'
+          nm out/vmlinux | grep -E ' (susfs_|try_umount|lru_gen_)' > out/v7-linked-symbols.txt
+          test -s out/v7-linked-symbols.txt
+          grep -q ' susfs_init$' out/v7-linked-symbols.txt
+          grep -q ' susfs_try_umount$' out/v7-linked-symbols.txt
+          grep -Eq ' (try_umount|ksu_handle_umount)(\\.|$)' out/v7-linked-symbols.txt
+          grep -Eq ' (lru_gen_init_lruvec|lru_gen_)(\\.|$)' out/v7-linked-symbols.txt
           sha256sum out/arch/arm64/boot/Image build/out/beyond2lte/boot.img build/out/beyond2lte/dtbo.img
 
       - name: Collect V7 artifacts
@@ -95,6 +97,7 @@ jobs:
           cp build/out/beyond2lte/boot.img alice-v7-artifacts/ALice_S10Plus_V7_REPO_BOOT.img
           cp build/out/beyond2lte/dtbo.img alice-v7-artifacts/ALice_S10Plus_V7_REPO_DTBO.img
           cp out/.config alice-v7-artifacts/ALice_S10Plus_V7.config
+          cp out/v7-linked-symbols.txt alice-v7-artifacts/ALice_S10Plus_V7_LINKED_SYMBOLS.txt
           cp docs/ALICE_S10PLUS_V7.md alice-v7-artifacts/
           sha256sum alice-v7-artifacts/* > alice-v7-artifacts/SHA256SUMS
 
