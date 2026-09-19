@@ -18,8 +18,8 @@ V9 starts directly from the phone-tested V4 commit
   path.
 - KernelSU is pinned to `longuirom/KernelSU` branch `32567b`, commit
   `7bd071c11f5a4d22729d73179d149493a6362a26`, ABI 32567.
-- The automatic syscall-table hook is used for Linux 4.14. V4 manual KSU hook
-  call sites remain inactive.
+- The automatic syscall-table hook is used for Linux 4.14. The seven legacy
+  manual KSU hook call sites from V4 are removed in V9.
 - SUSFS v2.2 NON-GKI and Try Umount are enabled. The integration follows the
   Linux 4.14 SUSFS patching model in `cyberc3dr/nGKI_Kernel_Build`; the V4
   tree already contains the corresponding kernel-side SUSFS 2.2 hooks, so V9
