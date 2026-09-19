@@ -64,60 +64,7 @@ jobs:
           ! grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' arch/arm64/configs/beyond2lte.config
           ! grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' arch/arm64/configs/beyond2lte.config
           grep -q 'static const char \*default_compressor = "lz4";' drivers/block/zram/zram_drv.c
-          grep -q '^#define SUSFS_VERSION "v2.2.0"
-
-      - name: Build beyond2lte V9
-        run: |
-          chmod +x build.sh
-          ./build.sh -m beyond2lte -k y -r n
-
-      - name: Verify kernel, LMKD, KSU, SUSFS and dormant MGLRU
-        run: |
-          test -s out/arch/arm64/boot/Image
-          test -s out/vmlinux
-          test -s build/out/beyond2lte/boot.img
-          test -s build/out/beyond2lte/dtbo.img
-          grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' out/.config
-          grep -q '^CONFIG_LRU_GEN=y$' out/.config
-          grep -q '^# CONFIG_LRU_GEN_ENABLED is not set$' out/.config
-          grep -q '^# CONFIG_LRU_GEN_STATS is not set$' out/.config
-          ! grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' out/.config
-          grep -q '^CONFIG_CRYPTO_LZ4=y$' out/.config
-          grep -q '^CONFIG_PSI=y$' out/.config
-          grep -q '^CONFIG_MEMCG=y$' out/.config
-          grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
-          grep -q '^CONFIG_KSU=y$' out/.config
-          grep -q '^CONFIG_KSU_TAMPER_SYSCALL_TABLE=y$' out/.config
-          grep -q '^# CONFIG_KSU_KPROBES_KSUD is not set$' out/.config
-          ! grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' out/.config
-          grep -q '^CONFIG_KSU_SUSFS=y$' out/.config
-          grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' out/.config
-          grep -q '^CONFIG_EROFS_FS=y$' out/.config
-          nm out/vmlinux | grep -E ' (lru_gen_|susfs_|try_umount)' > out/v9-linked-symbols.txt
-          test -s out/v9-linked-symbols.txt
-          grep -q ' lru_gen_init_lruvec$' out/v9-linked-symbols.txt
-          grep -q ' susfs_init$' out/v9-linked-symbols.txt
-          grep -q ' try_umount$' out/v9-linked-symbols.txt
-          sha256sum out/arch/arm64/boot/Image build/out/beyond2lte/boot.img build/out/beyond2lte/dtbo.img
-
-      - name: Collect V9 artifacts
-        run: |
-          mkdir -p alice-v9-artifacts
-          cp out/arch/arm64/boot/Image alice-v9-artifacts/ALice_S10Plus_V9_KSU32567_MGLRU_DIAG_Image
-          cp build/out/beyond2lte/boot.img alice-v9-artifacts/ALice_S10Plus_V9_REPO_BOOT.img
-          cp build/out/beyond2lte/dtbo.img alice-v9-artifacts/ALice_S10Plus_V9_REPO_DTBO.img
-          cp out/.config alice-v9-artifacts/ALice_S10Plus_V9.config
-          cp out/v9-linked-symbols.txt alice-v9-artifacts/ALice_S10Plus_V9_LINKED_SYMBOLS.txt
-          cp docs/ALICE_S10PLUS_V9_MGLRU_DIAG.md alice-v9-artifacts/
-          sha256sum alice-v9-artifacts/* > alice-v9-artifacts/SHA256SUMS
-
-      - name: Upload V9 artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ALice-S10Plus-V9-KSU32567-MGLRU-DIAG
-          path: alice-v9-artifacts/
-          if-no-files-found: error
- include/linux/susfs.h
+          grep -q '^#define SUSFS_VERSION "v2.2.0"$' include/linux/susfs.h
           ! grep -q 'ksu_handle_execveat' fs/exec.c
           ! grep -q 'ksu_handle_faccessat' fs/open.c
           ! grep -q 'ksu_handle_sys_read' fs/read_write.c
