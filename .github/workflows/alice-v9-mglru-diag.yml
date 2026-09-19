@@ -1,4 +1,4 @@
-name: ALice S10+ V9 V4-based MGLRU diagnostic
+name: ALice S10+ V9 KSU 32567 + dormant MGLRU
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout exact V9 branch
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
           fetch-depth: 0
 
       - name: Install build dependencies
@@ -24,13 +24,36 @@ jobs:
             bc bison build-essential cpio curl flex libelf-dev libssl-dev \
             python3 xz-utils clang lld llvm
 
-      - name: Apply the boot-proven V4 KernelSU-Next SUSFS bridge
+      - name: Pin longuirom KernelSU ABI 32567 and merge SUSFS 2.2
         run: |
-          test "$(git -C KernelSU-Next rev-parse HEAD)" = fd093e8b879063aeb0192a3959b0652101ded623
-          git apply --check --directory=KernelSU-Next .github/alice-ksunext-susfs-v2.2.patch
-          git apply --directory=KernelSU-Next .github/alice-ksunext-susfs-v2.2.patch
-          git apply --check --directory=KernelSU-Next .github/alice-ksu-devpts-compat.patch
-          git apply --directory=KernelSU-Next .github/alice-ksu-devpts-compat.patch
+          git clone --branch 32567b --single-branch https://github.com/longuirom/KernelSU.git KernelSU-Longui
+          test "$(git -C KernelSU-Longui rev-parse HEAD)" = 7bd071c11f5a4d22729d73179d149493a6362a26
+          git -C KernelSU-Longui fetch --depth=1 origin b7d830918d863eaa88581fc88114065cc2d3e6b4
+          for path in \
+            Kconfig \
+            feature/kernel_umount.c \
+            ksu.c \
+            selinux/rules.c \
+            selinux/selinux.c \
+            selinux/selinux.h \
+            supercall/dispatch.c \
+            supercall/supercall.c
+          do
+            mkdir -p "/tmp/ksu-v9-base/kernel/$(dirname "$path")"
+            git -C KernelSU-Longui show b7d830918d863eaa88581fc88114065cc2d3e6b4:"kernel/$path" > "/tmp/ksu-v9-base/kernel/$path"
+            git merge-file --theirs \
+              "KernelSU-Longui/kernel/$path" \
+              "/tmp/ksu-v9-base/kernel/$path" \
+              ".github/v9-longuirom-overlay/kernel/$path"
+          done
+          ! grep -R -n -E '^(<<<<<<<|=======|>>>>>>>)' KernelSU-Longui/kernel
+          rm drivers/kernelsu
+          ln -s ../KernelSU-Longui/kernel drivers/kernelsu
+          test "$(readlink drivers/kernelsu)" = ../KernelSU-Longui/kernel
+          grep -q 'KSU_VERSION=32567' KernelSU-Longui/kernel/Makefile
+          grep -q 'config KSU_SUSFS' KernelSU-Longui/kernel/Kconfig
+          grep -q 'susfs_init();' KernelSU-Longui/kernel/ksu.c
+          grep -q 'SUSFS_MAGIC' KernelSU-Longui/kernel/supercall/supercall.c
 
       - name: Verify isolated V9 source profile
         run: |
@@ -41,6 +64,7 @@ jobs:
           ! grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' arch/arm64/configs/beyond2lte.config
           ! grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' arch/arm64/configs/beyond2lte.config
           grep -q 'static const char \*default_compressor = "lz4";' drivers/block/zram/zram_drv.c
+          grep -q '^#define SUSFS_VERSION "v2.2.0"$' include/linux/susfs.h
           git diff --check
 
       - name: Build beyond2lte V9
@@ -48,7 +72,7 @@ jobs:
           chmod +x build.sh
           ./build.sh -m beyond2lte -k y -r n
 
-      - name: Verify kernel, LMKD prerequisites and dormant MGLRU
+      - name: Verify kernel, LMKD, KSU, SUSFS and dormant MGLRU
         run: |
           test -s out/arch/arm64/boot/Image
           test -s out/vmlinux
@@ -64,19 +88,23 @@ jobs:
           grep -q '^CONFIG_MEMCG=y$' out/.config
           grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
           grep -q '^CONFIG_KSU=y$' out/.config
-          grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' out/.config
+          grep -q '^CONFIG_KSU_TAMPER_SYSCALL_TABLE=y$' out/.config
+          grep -q '^# CONFIG_KSU_KPROBES_KSUD is not set$' out/.config
+          ! grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' out/.config
           grep -q '^CONFIG_KSU_SUSFS=y$' out/.config
+          grep -q '^CONFIG_KSU_SUSFS_TRY_UMOUNT=y$' out/.config
           grep -q '^CONFIG_EROFS_FS=y$' out/.config
-          nm out/vmlinux | grep -E ' (lru_gen_|susfs_)' > out/v9-linked-symbols.txt
+          nm out/vmlinux | grep -E ' (lru_gen_|susfs_|try_umount)' > out/v9-linked-symbols.txt
           test -s out/v9-linked-symbols.txt
           grep -q ' lru_gen_init_lruvec$' out/v9-linked-symbols.txt
           grep -q ' susfs_init$' out/v9-linked-symbols.txt
+          grep -q ' try_umount$' out/v9-linked-symbols.txt
           sha256sum out/arch/arm64/boot/Image build/out/beyond2lte/boot.img build/out/beyond2lte/dtbo.img
 
       - name: Collect V9 artifacts
         run: |
           mkdir -p alice-v9-artifacts
-          cp out/arch/arm64/boot/Image alice-v9-artifacts/ALice_S10Plus_V9_MGLRU_DIAG_Image
+          cp out/arch/arm64/boot/Image alice-v9-artifacts/ALice_S10Plus_V9_KSU32567_MGLRU_DIAG_Image
           cp build/out/beyond2lte/boot.img alice-v9-artifacts/ALice_S10Plus_V9_REPO_BOOT.img
           cp build/out/beyond2lte/dtbo.img alice-v9-artifacts/ALice_S10Plus_V9_REPO_DTBO.img
           cp out/.config alice-v9-artifacts/ALice_S10Plus_V9.config
@@ -87,6 +115,6 @@ jobs:
       - name: Upload V9 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ALice-S10Plus-V9-MGLRU-DIAG
+          name: ALice-S10Plus-V9-KSU32567-MGLRU-DIAG
           path: alice-v9-artifacts/
           if-no-files-found: error
