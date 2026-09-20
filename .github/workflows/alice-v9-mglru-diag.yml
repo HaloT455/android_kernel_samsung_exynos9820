@@ -1,4 +1,4 @@
-name: ALice S10+ V9 KSU 32567 + dormant MGLRU
+name: ALice S10+ V9 KSU 32567 + MGLRU enabled + sucompat fix
 
 on:
   push:
@@ -54,12 +54,15 @@ jobs:
           grep -q 'config KSU_SUSFS' KernelSU-Longui/kernel/Kconfig
           grep -q 'susfs_init();' KernelSU-Longui/kernel/ksu.c
           grep -q 'SUSFS_MAGIC' KernelSU-Longui/kernel/supercall/supercall.c
+          git -C KernelSU-Longui apply --check ../.github/patches/v9r2-sucompat-allowlist.patch
+          git -C KernelSU-Longui apply ../.github/patches/v9r2-sucompat-allowlist.patch
+          python3 .github/scripts/check-v9-sucompat.py KernelSU-Longui/kernel/feature/sucompat.c
 
       - name: Verify isolated V9 source profile
         run: |
           grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' arch/arm64/configs/beyond2lte.config
           grep -q '^CONFIG_LRU_GEN=y$' arch/arm64/configs/beyond2lte.config
-          grep -q '^# CONFIG_LRU_GEN_ENABLED is not set$' arch/arm64/configs/beyond2lte.config
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y$' arch/arm64/configs/beyond2lte.config
           grep -q '^# CONFIG_LRU_GEN_STATS is not set$' arch/arm64/configs/beyond2lte.config
           ! grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' arch/arm64/configs/beyond2lte.config
           ! grep -q '^CONFIG_ALICE_EAS_BALANCED=y$' arch/arm64/configs/beyond2lte.config
@@ -80,7 +83,7 @@ jobs:
           chmod +x build.sh
           ./build.sh -m beyond2lte -k y -r n
 
-      - name: Verify kernel, LMKD, KSU, SUSFS and dormant MGLRU
+      - name: Verify kernel, LMKD, KSU, SUSFS and MGLRU enabled + sucompat fix
         if: ${{ always() && steps.kernel_build.outcome == 'success' }}
         run: |
           set -euxo pipefail
@@ -90,12 +93,14 @@ jobs:
           test -s build/out/beyond2lte/dtbo.img
           grep -q '^CONFIG_ALICE_EXYNOS9820_FREQ_ONLY_OC=y$' out/.config
           grep -q '^CONFIG_LRU_GEN=y$' out/.config
-          grep -q '^# CONFIG_LRU_GEN_ENABLED is not set$' out/.config
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y$' out/.config
           grep -q '^# CONFIG_LRU_GEN_STATS is not set$' out/.config
           ! grep -q '^CONFIG_ALICE_ZRAM_PROFILE=y$' out/.config
           grep -q '^CONFIG_CRYPTO_LZ4=y$' out/.config
           grep -q '^CONFIG_PSI=y$' out/.config
           grep -q '^CONFIG_MEMCG=y$' out/.config
+          grep -q '^# CONFIG_ARM64_HW_AFDBM is not set$' out/.config
+          ! grep -q '^CONFIG_ARCH_HAS_NONLEAF_PMD_YOUNG=y$' out/.config
           grep -q '^# CONFIG_ANDROID_LOW_MEMORY_KILLER is not set$' out/.config
           grep -q '^CONFIG_KSU=y$' out/.config
           grep -q '^CONFIG_KSU_TAMPER_SYSCALL_TABLE=y$' out/.config
@@ -115,18 +120,18 @@ jobs:
         if: ${{ always() && steps.kernel_build.outcome == 'success' }}
         run: |
           mkdir -p alice-v9-artifacts
-          cp out/arch/arm64/boot/Image alice-v9-artifacts/ALice_S10Plus_V9_KSU32567_MGLRU_DIAG_Image
+          cp out/arch/arm64/boot/Image alice-v9-artifacts/ALice_S10Plus_V9R2_KSU32567_MGLRU_Image
           cp build/out/beyond2lte/boot.img alice-v9-artifacts/ALice_S10Plus_V9_REPO_BOOT.img
           cp build/out/beyond2lte/dtbo.img alice-v9-artifacts/ALice_S10Plus_V9_REPO_DTBO.img
           cp out/.config alice-v9-artifacts/ALice_S10Plus_V9.config
           cp out/v9-linked-symbols.txt alice-v9-artifacts/ALice_S10Plus_V9_LINKED_SYMBOLS.txt
-          cp docs/ALICE_S10PLUS_V9_MGLRU_DIAG.md alice-v9-artifacts/
+          cp docs/ALICE_S10PLUS_V9R2.md alice-v9-artifacts/
           sha256sum alice-v9-artifacts/* > alice-v9-artifacts/SHA256SUMS
 
       - name: Upload V9 artifacts
         if: ${{ always() && steps.kernel_build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ALice-S10Plus-V9-KSU32567-MGLRU-DIAG
+          name: ALice-S10Plus-V9R2-EPICD-MGLRU
           path: alice-v9-artifacts/
           if-no-files-found: error

@@ -1,0 +1,25 @@
+--- a/kernel/feature/sucompat.c
++++ b/kernel/feature/sucompat.c
+@@ -111,16 +111,13 @@
+ 		return false;
+ 	goto check_ptr;
+ 
+-	// NOTE: shell has its seccomp disabled, so we only need to check for this thing
+-	// short-circuit if not shell! as we allow apps on setuid lsm by disabling seccomp
+ uid_check:
+-	if (likely(uid != 2000))
+-		goto check_ptr;
+-
+-	// use our noinline copy.
+-	// only shell falls through this. 
+-	// nbd that it opens up a stack frame
+-	// having small code around here is worth
++	/*
++	 * No seccomp filter does not imply a KernelSU grant. Native services
++	 * such as epicd also run without one. Check every non-root UID before
++	 * redirecting access/stat/exec so their ordinary su probes stay native.
++	 * Keep shell, Manager and granted apps on the existing allowlist path.
++	 */
+ 	if (!__ksu_is_allow_uid_copy(uid))
+ 		return false;
+ 
