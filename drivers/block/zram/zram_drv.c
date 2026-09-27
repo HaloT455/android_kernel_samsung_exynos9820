@@ -2172,8 +2172,9 @@ static ssize_t max_comp_streams_show(struct device *dev,
 {
 #if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
 	/* Report the effective codec concurrency, not allocated CPU buffers. */
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-		min(num_online_cpus(), CONFIG_ZRAM_COMPRESSION_CONCURRENCY));
+	return scnprintf(buf, PAGE_SIZE, "%u\n",
+		min_t(unsigned int, num_online_cpus(),
+		      CONFIG_ZRAM_COMPRESSION_CONCURRENCY));
 #else
 	return scnprintf(buf, PAGE_SIZE, "%d\n", num_online_cpus());
 #endif
