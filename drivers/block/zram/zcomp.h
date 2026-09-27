@@ -10,10 +10,15 @@
 #ifndef _ZCOMP_H_
 #define _ZCOMP_H_
 
+#include <linux/spinlock.h>
+
 struct zcomp_strm {
 	/* compression/decompression buffer */
 	void *buffer;
 	struct crypto_comp *tfm;
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	spinlock_t *codec_lock;
+#endif
 };
 
 /* dynamic per-device compression frontend */
@@ -21,6 +26,9 @@ struct zcomp {
 	struct zcomp_strm * __percpu *stream;
 	const char *name;
 	struct hlist_node node;
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	spinlock_t codec_locks[CONFIG_ZRAM_COMPRESSION_CONCURRENCY];
+#endif
 };
 
 int zcomp_cpu_up_prepare(unsigned int cpu, struct hlist_node *node);

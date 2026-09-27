@@ -15,6 +15,18 @@ config ZRAM
 
 	  See Documentation/blockdev/zram.txt for more information.
 
+config ZRAM_COMPRESSION_CONCURRENCY
+	int "Maximum concurrent ZRAM codec operations (0 for per-CPU)"
+	depends on ZRAM
+	range 0 32
+	default 0
+	help
+	  Bound simultaneous compression/decompression calls per ZRAM device.
+	  Keep per-CPU buffers and use short shared codec locks; no CPU affinity
+	  or worker threads are added. Four allows up to four codec operations
+	  at once, even on an eight-core CPU. This can reduce throughput and
+	  does not by itself guarantee lower energy consumption.
+
 config ZRAM_WRITEBACK
        bool "Write back incompressible or idle page to backing device"
        depends on ZRAM

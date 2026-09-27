@@ -1332,7 +1332,8 @@ static int qbt2000_set_timer(struct qbt2000_drvdata *drvdata)
 {
 	int rc = 0;
 
-	setup_timer(&drvdata->dbg_timer, qbt2000_timer_func,
+	/* Debug-only polling must not wake an otherwise idle CPU. */
+	setup_deferrable_timer(&drvdata->dbg_timer, qbt2000_timer_func,
 			(unsigned long)drvdata);
 	drvdata->wq_dbg = create_singlethread_workqueue("qbt2000_debug_wq");
 	if (!drvdata->wq_dbg) {

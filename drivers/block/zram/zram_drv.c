@@ -2170,12 +2170,29 @@ static void zram_debugfs_unregister(struct zram *zram) {};
 static ssize_t max_comp_streams_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	/* Report the effective codec concurrency, not allocated CPU buffers. */
+	return scnprintf(buf, PAGE_SIZE, "%d\n",
+		min(num_online_cpus(), CONFIG_ZRAM_COMPRESSION_CONCURRENCY));
+#else
 	return scnprintf(buf, PAGE_SIZE, "%d\n", num_online_cpus());
+#endif
 }
 
 static ssize_t max_comp_streams_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	unsigned int requested;
+
+	if (kstrtouint(buf, 10, &requested) || !requested)
+		return -EINVAL;
+	/* Keep legacy ROM writes of the CPU count compatible. Larger values
+	 * are capped; lowering below the build-time bound is unsupported.
+	 */
+	if (requested < CONFIG_ZRAM_COMPRESSION_CONCURRENCY)
+		return -EOPNOTSUPP;
+#endif
 	return len;
 }
 

@@ -130,6 +130,8 @@ void zcomp_stream_put(struct zcomp *comp)
 int zcomp_compress(struct zcomp_strm *zstrm,
 		const void *src, unsigned int *dst_len)
 {
+	int ret;
+
 	/*
 	 * Our dst memory (zstrm->buffer) is always `2 * PAGE_SIZE' sized
 	 * because sometimes we can endup having a bigger compressed data
@@ -146,19 +148,37 @@ int zcomp_compress(struct zcomp_strm *zstrm,
 	 */
 	*dst_len = PAGE_SIZE * 2;
 
-	return crypto_comp_compress(zstrm->tfm,
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	/* Lock only the codec call, never allocation or zsmalloc mapping.
+	 * zcomp_stream_get() already pins the caller and owns its buffer.
+	 */
+	spin_lock(zstrm->codec_lock);
+#endif
+	ret = crypto_comp_compress(zstrm->tfm,
 			src, PAGE_SIZE,
 			zstrm->buffer, dst_len);
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	spin_unlock(zstrm->codec_lock);
+#endif
+	return ret;
 }
 
 int zcomp_decompress(struct zcomp_strm *zstrm,
 		const void *src, unsigned int src_len, void *dst)
 {
 	unsigned int dst_len = PAGE_SIZE;
+	int ret;
 
-	return crypto_comp_decompress(zstrm->tfm,
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	spin_lock(zstrm->codec_lock);
+#endif
+	ret = crypto_comp_decompress(zstrm->tfm,
 			src, src_len,
 			dst, &dst_len);
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	spin_unlock(zstrm->codec_lock);
+#endif
+	return ret;
 }
 
 int zcomp_cpu_up_prepare(unsigned int cpu, struct hlist_node *node)
@@ -174,6 +194,9 @@ int zcomp_cpu_up_prepare(unsigned int cpu, struct hlist_node *node)
 		pr_err("Can't allocate a compression stream\n");
 		return -ENOMEM;
 	}
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	zstrm->codec_lock = &comp->codec_locks[cpu % CONFIG_ZRAM_COMPRESSION_CONCURRENCY];
+#endif
 	*per_cpu_ptr(comp->stream, cpu) = zstrm;
 	return 0;
 }
@@ -193,6 +216,12 @@ int zcomp_cpu_dead(unsigned int cpu, struct hlist_node *node)
 static int zcomp_init(struct zcomp *comp)
 {
 	int ret;
+#if CONFIG_ZRAM_COMPRESSION_CONCURRENCY > 0
+	int i;
+
+	for (i = 0; i < CONFIG_ZRAM_COMPRESSION_CONCURRENCY; i++)
+		spin_lock_init(&comp->codec_locks[i]);
+#endif
 
 	comp->stream = alloc_percpu(struct zcomp_strm *);
 	if (!comp->stream)

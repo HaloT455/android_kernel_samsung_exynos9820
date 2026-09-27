@@ -140,7 +140,7 @@ static void set_wake_locked(int wake)
 			port->ops->set_wake(port, wake);
 		}
 #endif
-		pr_err("[BT] set_wake_locked value = %d\n", wake);
+		pr_debug("[BT] set_wake_locked value = %d\n", wake);
 		bt_wake_state = wake;
 	}
 }
@@ -153,7 +153,8 @@ static enum hrtimer_restart enter_lpm(struct hrtimer *timer)
     if (bt_lpm.host_wake == 0)
 	    exynos_update_ip_idle_status(idle_btip_index, STATUS_IDLE);
 
-	__pm_wakeup_event(bt_lpm.bt_ws, HZ/2);
+	/* __pm_wakeup_event() takes milliseconds, not jiffies. */
+	__pm_wakeup_event(bt_lpm.bt_ws, 500);
 
 	return HRTIMER_NORESTART;
 }
@@ -187,8 +188,8 @@ static void update_host_wake_locked(int host_wake)
 		 * The chipset deasserts the hostwake lock, when there is no
 		 * more data to send.
 		 */
-		pr_info("[BT] update_host_wake_locked host_wake is deasserted. release wakelock in 1s\n");
-		__pm_wakeup_event(bt_lpm.host_ws, HZ);
+		pr_debug("[BT] host_wake deasserted; release wakelock in 1s\n");
+		__pm_wakeup_event(bt_lpm.host_ws, 1000);
 
 		if (bt_lpm.dev_wake == 0)
 			exynos_update_ip_idle_status(idle_btip_index, STATUS_IDLE);

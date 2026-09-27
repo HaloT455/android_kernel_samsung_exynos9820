@@ -2966,11 +2966,11 @@ bool dhd_runtimepm_state(dhd_pub_t *dhd)
 			!DHD_CHECK_CFG_IN_PROGRESS(dhd) && !dhd_os_check_wakelock_all(bus->dhd)) {
 #ifdef WL_CFG80211
 			ps_mode_off_dur = dhd_ps_mode_managed_dur(dhd);
-			DHD_ERROR(("%s: DHD Idle state!! -  idletime :%d, wdtick :%d, "
+			DHD_INFO(("%s: DHD Idle state!! -  idletime :%d, wdtick :%d, "
 				"PS mode off dur: %d sec \n", __FUNCTION__,
 				bus->idletime, dhd_runtimepm_ms, ps_mode_off_dur));
 #else
-			DHD_ERROR(("%s: DHD Idle state!! -  idletime :%d, wdtick :%d \n",
+			DHD_INFO(("%s: DHD Idle state!! -  idletime :%d, wdtick :%d \n",
 					__FUNCTION__, bus->idletime, dhd_runtimepm_ms));
 #endif /* WL_CFG80211 */
 			bus->bus_wake = 0;
@@ -3007,7 +3007,7 @@ bool dhd_runtimepm_state(dhd_pub_t *dhd)
 				wake_up(&bus->rpm_queue);
 				return FALSE;
 			}
-			DHD_ERROR(("%s, update suspend states\n", __FUNCTION__));
+			DHD_INFO(("%s, update suspend states\n", __FUNCTION__));
 			DHD_GENERAL_LOCK(dhd, flags);
 			DHD_BUS_BUSY_CLEAR_RPM_SUSPEND_IN_PROGRESS(dhd);
 			DHD_BUS_BUSY_SET_RPM_SUSPEND_DONE(dhd);
@@ -3082,14 +3082,14 @@ bool dhd_runtimepm_state(dhd_pub_t *dhd)
 
 			smp_wmb();
 			wake_up(&bus->rpm_queue);
-			DHD_ERROR(("%s : runtime resume ended \n", __FUNCTION__));
+			DHD_INFO(("%s : runtime resume ended \n", __FUNCTION__));
 			return TRUE;
 		} else {
 			DHD_GENERAL_UNLOCK(dhd, flags);
 			/* Since one of the contexts are busy (TX, IOVAR or RX)
 			 * we should not suspend
 			 */
-			DHD_ERROR(("%s : bus is active with dhd_bus_busy_state = 0x%x\n",
+			DHD_INFO(("%s : bus is active with dhd_bus_busy_state = 0x%x\n",
 				__FUNCTION__, dhd->dhd_bus_busy_state));
 			return FALSE;
 		}
