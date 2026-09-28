@@ -1,0 +1,2 @@
+PASS: governor sparse/burst IOWAIT, rate-cache retry, queued coalescing, in-flight downscale, limits
+PASS: 8 callers, 3200 actual wrapper calls, maximum 4 concurrent codecs, error-path unlocks

@@ -1,0 +1,57 @@
+{
+  "v4_sha256": "60a4fc08a8c7de555e5cf5071c56e495ae29d4b78790a32f9bac596b9c9e98e3",
+  "v9r2_sha256": "5c1396b17ee22d2dee09b97cc86515ff649d63ff3cf0245ac65d6fc755884284",
+  "ramdisk_identical": true,
+  "ramdisk_sha256": "1078b4b9c1dac08300725b33df482bc6014e3f637c713fc5a2e2ca9f66879f55",
+  "enabled_config_differences": {
+    "CONFIG_KSU_ALLOWLIST_WORKAROUND": {
+      "V4": "CONFIG_KSU_ALLOWLIST_WORKAROUND=y",
+      "V9R2": "CONFIG_KSU_ALLOWLIST_WORKAROUND=n"
+    },
+    "CONFIG_KSU_FEATURE_ADBROOT": {
+      "V4": "CONFIG_KSU_FEATURE_ADBROOT=n",
+      "V9R2": "CONFIG_KSU_FEATURE_ADBROOT=y"
+    },
+    "CONFIG_KSU_FEATURE_SULOG": {
+      "V4": "CONFIG_KSU_FEATURE_SULOG=n",
+      "V9R2": "CONFIG_KSU_FEATURE_SULOG=y"
+    },
+    "CONFIG_KSU_HEURISTIC_IN_TREE_BUILD": {
+      "V4": "CONFIG_KSU_HEURISTIC_IN_TREE_BUILD=n",
+      "V9R2": "CONFIG_KSU_HEURISTIC_IN_TREE_BUILD=y"
+    },
+    "CONFIG_KSU_LSM_SECURITY_HOOKS": {
+      "V4": "CONFIG_KSU_LSM_SECURITY_HOOKS=n",
+      "V9R2": "CONFIG_KSU_LSM_SECURITY_HOOKS=y"
+    },
+    "CONFIG_KSU_MANUAL_HOOK": {
+      "V4": "CONFIG_KSU_MANUAL_HOOK=y",
+      "V9R2": "CONFIG_KSU_MANUAL_HOOK=n"
+    },
+    "CONFIG_KSU_SUSFS_ENABLE_LOG": {
+      "V4": "CONFIG_KSU_SUSFS_ENABLE_LOG=y",
+      "V9R2": "CONFIG_KSU_SUSFS_ENABLE_LOG=n"
+    },
+    "CONFIG_KSU_SUSFS_TRY_UMOUNT": {
+      "V4": "CONFIG_KSU_SUSFS_TRY_UMOUNT=n",
+      "V9R2": "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
+    },
+    "CONFIG_KSU_TAMPER_SYSCALL_TABLE": {
+      "V4": "CONFIG_KSU_TAMPER_SYSCALL_TABLE=n",
+      "V9R2": "CONFIG_KSU_TAMPER_SYSCALL_TABLE=y"
+    },
+    "CONFIG_LOCALVERSION": {
+      "V4": "CONFIG_LOCALVERSION=\"-ALice-S10P-OC-SUSFS-V4-TEST\"",
+      "V9R2": "CONFIG_LOCALVERSION=\"-ALice-S10P-V9R2-MGLRU\""
+    },
+    "CONFIG_LRU_GEN": {
+      "V4": "CONFIG_LRU_GEN=n",
+      "V9R2": "CONFIG_LRU_GEN=y"
+    },
+    "CONFIG_LRU_GEN_ENABLED": {
+      "V4": "CONFIG_LRU_GEN_ENABLED=n",
+      "V9R2": "CONFIG_LRU_GEN_ENABLED=y"
+    }
+  },
+  "interpretation": "Does not identify a proven single battery-drain cause. Radio source unchanged V4 to V9R2; no extra ramdisk tuning. MGLRU/KSU differ."
+}

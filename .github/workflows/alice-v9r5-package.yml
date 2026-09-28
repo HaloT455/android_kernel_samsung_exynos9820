@@ -1,0 +1,42 @@
+name: ALice S10+ V9R5 verified test boot
+
+on:
+  push:
+    branches:
+      - agent/beyond2lte-v9r5-package
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package-verified-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout packaging recipe and original ramdisk files
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Download completed V9R5 kernel build
+        uses: actions/download-artifact@v4
+        with:
+          name: ALice-S10Plus-V9R5-BALANCED
+          run-id: 36338314235
+          github-token: ${{ github.token }}
+          path: ci-kernel
+
+      - name: Reproduce and verify exact test boot
+        run: python3 .github/scripts/package-v9r5.py --ci ci-kernel --output boot-test
+
+      - name: Upload flashable boot and instructions
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALice-S10Plus-V9R5-BOOT-TEST
+          path: boot-test/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 9
