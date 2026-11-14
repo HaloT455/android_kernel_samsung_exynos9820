@@ -97,6 +97,13 @@ extern struct list_head *lb_prefer_cfs_tasks(int src_cpu, int dst_cpu);
 extern int lb_need_active_balance(enum cpu_idle_type idle,
 				struct sched_domain *sd, int src_cpu, int dst_cpu);
 
+/* Energy-step OPP selection for Exynos9820 V9R2. Returns 0 if unavailable. */
+#ifdef CONFIG_CPU_FREQ_GOV_ENERGY_STEP
+unsigned int ems_pick_energy_step(unsigned int cpu, unsigned long util,
+				unsigned long max_util,
+				unsigned int min_freq, unsigned int max_freq);
+#endif
+
 /* check the status of energy table */
 extern bool energy_initialized;
 extern void set_energy_table_status(bool status);
