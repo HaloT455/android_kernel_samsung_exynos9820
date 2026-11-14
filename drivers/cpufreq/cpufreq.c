@@ -587,6 +587,15 @@ static struct cpufreq_governor *find_governor(const char *str_governor)
 {
 	struct cpufreq_governor *t;
 
+#ifdef CONFIG_CPU_FREQ_GOV_ENERGY_STEP
+	/* Android vendor init may still write "schedutil" on boot.
+	 * Preserve the write ABI, but actually run the energy_step governor
+	 * and show energy_step in scaling_governor.
+	 */
+	if (!strncasecmp(str_governor, "schedutil", CPUFREQ_NAME_LEN))
+		str_governor = "energy_step";
+#endif
+
 	for_each_governor(t)
 		if (!strncasecmp(str_governor, t->name, CPUFREQ_NAME_LEN))
 			return t;
