@@ -6,6 +6,8 @@
  */
 
 #include <linux/cpufreq.h>
+#include <linux/math64.h>
+#include <linux/limits.h>
 #include <trace/events/ems.h>
 
 #include "../sched.h"
