@@ -959,9 +959,13 @@ unsigned int ems_pick_energy_step(unsigned int cpu, unsigned long util,
 		/* Dynamic energy per unit of useful work with a modest
 		 * static-power penalty to avoid an excessive high OPP.
 		 */
-		cost = div64_u64((u64)state->power *
-			(max_capacity + required), state->cap);
-		cost += state->power >> 3;
+		/*
+		 * Favour the lowest real power OPP at light load. Add
+		 * proportional work cost rather than raw power/capacity,
+		 * which could perversely select a high OPP when util=0.
+		 */
+		cost = state->power +
+			div64_u64((u64)state->power * required, state->cap);
 
 		if (cost < best_cost ||
 		    (cost == best_cost && state->frequency < best_freq)) {
