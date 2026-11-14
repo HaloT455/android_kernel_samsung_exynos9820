@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/crypto.h>
 #include <linux/vmalloc.h>
+#include <linux/string.h>
 #include <linux/lz4kd.h>
 
 
@@ -40,9 +41,20 @@ static int lz4kd_compress_crypto(struct crypto_tfm *tfm, const u8 *src, unsigned
 	int ret = 0;
 
 	ret = lz4kd_encode(ctx->lz4kd_comp_mem, src, dst, slen, *dlen, 0);
-	/* 0 means incompressible: ZRAM must store the original page. */
-	if (ret <= 0)
+	if (ret < 0)
 		return -EINVAL;
+
+	/* Incompressible input (ret == 0) is NOT an I/O error: returning
+	 * an error here would abort a ZRAM swap write. Supply the original
+	 * page as a PAGE_SIZE-sized result so ZRAM takes its huge-page path.
+	 */
+	if (ret == 0) {
+		if (*dlen < slen)
+			return -ENOSPC;
+		memcpy(dst, src, slen);
+		*dlen = slen;
+		return 0;
+	}
 
 	*dlen = ret;
 
