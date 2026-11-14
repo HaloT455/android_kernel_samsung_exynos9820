@@ -111,6 +111,17 @@ config CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
 	  have a look at the help section of that governor. The fallback
 	  governor will be 'performance'.
 
+config CPU_FREQ_DEFAULT_GOV_ENERGY_STEP
+	bool "energy_step (Exynos9820 EMS)"
+	depends on SMP && SCHED_EMS
+	select CPU_FREQ_GOV_SCHEDUTIL
+	select CPU_FREQ_GOV_ENERGY_STEP
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Make the Exynos9820 EMS energy_step governor the boot default.
+	  Uses the Samsung capacity/power OPP tables and scheduler signals.
+	  The original schedutil ABI hooks are preserved for Android services.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -208,6 +219,15 @@ config CPU_FREQ_GOV_SCHEDUTIL
 	  both cases.
 
 	  If in doubt, say N.
+
+config CPU_FREQ_GOV_ENERGY_STEP
+	bool "Exynos9820 EMS capacity/power energy-step governor"
+	depends on CPU_FREQ_GOV_SCHEDUTIL && SCHED_EMS
+	help
+	  Convert the Exynos9820 scheduler-driven frequency governor
+	  into an EMS power-table energy-step governor. Keeps the
+	  Samsung schedutil ABI for existing vendor hooks, but exposes
+	  only energy_step to CPUFreq when enabled.
 
 config FREQVAR_TUNE
 	bool "CPU frequency variant tuner"
