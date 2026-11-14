@@ -907,3 +907,67 @@ static int __init init_sched_energy_data(void)
 }
 core_initcall(init_sched_energy_data);
 #endif	/* CONFIG_SIMPLIFIED_ENERGY_MODEL */
+
+/*
+ * Select an operating point using the Exynos 9820 EMS capacity/power
+ * model. This is a V9R2-local implementation, not the Exynos2100
+ * energy_step governor (whose scheduling ABI is incompatible).
+ *
+ * @util and @max_util are the scheduler's capacity-scaled utilization.
+ * Only choose a state whose capacity can sustain 125% of that load
+ * and which is inside CPUFreq's policy limits. Return zero to use
+ * the legacy proportional fallback when the EMS table is absent.
+ */
+#ifdef CONFIG_CPU_FREQ_GOV_ENERGY_STEP
+unsigned int ems_pick_energy_step(unsigned int cpu, unsigned long util,
+				unsigned long max_util,
+				unsigned int min_freq, unsigned int max_freq)
+{
+	struct energy_table *table;
+	unsigned long required, max_capacity;
+	unsigned int best_freq = 0;
+	u64 best_cost = U64_MAX;
+	int i;
+
+	if (!get_energy_table_status() || !max_util || cpu >= nr_cpu_ids)
+		return 0;
+
+	table = &per_cpu(energy_table, cpu);
+	if (!table->states || !table->nr_states)
+		return 0;
+
+	max_capacity = table->states[table->nr_states - 1].cap;
+	if (!max_capacity)
+		return 0;
+
+	/* Match the scheduler's normal 80%-load tipping point. */
+	required = min_t(unsigned long, max_capacity,
+		div64_u64((u64)min(util, max_util) * max_capacity * 5,
+			  (u64)max_util * 4));
+
+	for (i = 0; i < table->nr_states; i++) {
+		const struct energy_state *state = &table->states[i];
+		u64 cost;
+
+		if (state->frequency < min_freq ||
+		    state->frequency > max_freq ||
+		    !state->cap || state->cap < required)
+			continue;
+
+		/* Dynamic energy per unit of useful work with a modest
+		 * static-power penalty to avoid an excessive high OPP.
+		 */
+		cost = div64_u64((u64)state->power *
+			(max_capacity + required), state->cap);
+		cost += state->power >> 3;
+
+		if (cost < best_cost ||
+		    (cost == best_cost && state->frequency < best_freq)) {
+			best_cost = cost;
+			best_freq = state->frequency;
+		}
+	}
+
+	return best_freq;
+}
+#endif /* CONFIG_CPU_FREQ_GOV_ENERGY_STEP */
