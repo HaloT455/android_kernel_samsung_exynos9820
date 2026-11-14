@@ -327,15 +327,26 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->max : policy->cur;
+#ifdef CONFIG_CPU_FREQ_GOV_ENERGY_STEP
+	unsigned int step_freq;
 
+	/* Native Exynos9820 EMS OPP power/capacity selection. */
+	step_freq = ems_pick_energy_step(policy->cpu, util, max,
+					policy->min, policy->max);
+	if (step_freq) {
+		freq = cpufreq_driver_resolve_freq(policy, step_freq);
+		trace_cpu_frequency_sugov(freq, util, policy->cpu);
+		return freq;
+	}
+#endif
+
+	/* Safe fallback until EMS energy table is available. */
 	freq = (freq + (freq >> 2)) * util / max;
-
 	if (freq == sg_policy->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
 		return sg_policy->next_freq;
 	sg_policy->cached_raw_freq = freq;
 	freq = cpufreq_driver_resolve_freq(policy, freq);
 	trace_cpu_frequency_sugov(freq, util, policy->cpu);
-
 	return freq;
 }
 
@@ -949,7 +960,11 @@ static void sugov_limits(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_governor schedutil_gov = {
+	#ifdef CONFIG_CPU_FREQ_GOV_ENERGY_STEP
+	.name = "energy_step",
+#else
 	.name = "schedutil",
+#endif
 	.owner = THIS_MODULE,
 	.dynamic_switching = true,
 	.init = sugov_init,
@@ -959,7 +974,8 @@ static struct cpufreq_governor schedutil_gov = {
 	.limits = sugov_limits,
 };
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
+#if defined(CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL) || \
+	defined(CONFIG_CPU_FREQ_DEFAULT_GOV_ENERGY_STEP)
 struct cpufreq_governor *cpufreq_default_governor(void)
 {
 	return &schedutil_gov;
